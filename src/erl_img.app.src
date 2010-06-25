@@ -1,0 +1,6 @@
+{application, erl_img,
+ [{description, "erl_img"},
+  {vsn, "0.01"},
+  {modules, []},
+  {registered, []},
+  {applications, [kernel, stdlib, crypto]}]}.
