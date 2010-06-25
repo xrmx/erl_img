@@ -5,7 +5,7 @@
 
 -module(image_gif).
 
--include("erl_img.hrl").
+-include_lib("erl_img/include/erl_img.hrl").
 
 -include("api.hrl").
 

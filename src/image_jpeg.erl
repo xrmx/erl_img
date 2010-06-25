@@ -5,7 +5,7 @@
 
 -module(image_jpeg).
 
--include("erl_img.hrl").
+-include_lib("erl_img/include/erl_img.hrl").
 
 -include("jpeg.hrl").
 -include("tiff.hrl").
