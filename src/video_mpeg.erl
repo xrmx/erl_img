@@ -14,20 +14,20 @@ mime_type() -> "video/mpeg".
 
 extensions() -> [".mpg", ".mpeg"].
 
-read_info(Fd) ->
+read_info(_Fd) ->
     {error, bad_magic}.
 
 
-write_info(Fd, IMG) ->
+write_info(_Fd, _IMG) ->
     {error, bad_image}.
 
-read(Fd,IMG) ->
+read(_Fd,_IMG) ->
     {error, bad_image}.
 
-read(Fd,IMG,PixFun,PixSt) ->
+read(_Fd,_IMG,_PixFun,_PixSt) ->
     {error, bad_image}.
 
-write(Fd,IMG) ->
+write(_Fd,_IMG) ->
     {error, bad_image}.
 
 

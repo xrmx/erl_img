@@ -42,8 +42,8 @@ extensions() -> [".bmp" ].
 
 read_info(Fd) ->
     case file:read(Fd, 54) of
-	{ok, << ?BMP_HEADER(Size,Offset),
-	        ?BMP_INFO(_,Width,Height,Planes,BitCount,
+	{ok, << ?BMP_HEADER(_Size,_Offset),
+	        ?BMP_INFO(_,Width,Height,Planes,_BitCount,
 			  Compression,_,_,_,_,_) >> } ->
 	    {ok, #erl_image  { type      = ?MODULE,
 			     width     = Width,
@@ -62,7 +62,7 @@ read_info(Fd) ->
     end.
 
 
-write_info(Fd, IMG) ->
+write_info(_Fd, _IMG) ->
     ok.
 
 read(Fd, IMG, RowFun, St0) ->
@@ -82,7 +82,7 @@ read(Fd, IMG) ->
 	 []).
 
 %% save image
-write(Fd, IMG) ->
+write(_Fd, _IMG) ->
     ok.
 
 %% Read all rows
@@ -95,7 +95,7 @@ read_pixels(Fd, IMG, RowFun, St0) ->
     read_pixels(Fd, PIX, 0, Height, RowLength, RowFun, St0).
 
 
-read_pixels(Fd, PIX, NRows, NRows, BytesPerRow, RowFun, St) ->
+read_pixels(_Fd, PIX, NRows, NRows, _BytesPerRow, _RowFun, St) ->
     {ok,PIX#erl_pixmap { pixels = St }};
 read_pixels(Fd, PIX, Ri, NRows, BytesPerRow, RowFun, St) ->
     case file:read(Fd, BytesPerRow) of

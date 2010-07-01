@@ -6,7 +6,7 @@
 -module(image_undef).
 
 -include_lib("erl_img/include/erl_img.hrl").
--inlcude("api.hrl").
+-include("api.hrl").
 
 magic(_) -> false.
 
@@ -15,19 +15,19 @@ mime_type() -> "".
 extensions() -> [].
 
     
-read_info(Fd) ->
+read_info(_Fd) ->
     {error, bad_magic}.
 
-write_info(Fd, IMG) ->
+write_info(_Fd, _IMG) ->
     {error, bad_image}.
 
-read(Fd,IMG) ->
+read(_Fd,_IMG) ->
     {error, bad_image}.
 
-read(Fd,IMG,PixFun,PixSt) ->
+read(_Fd,_IMG,_PixFun,_PixSt) ->
     {error, bad_image}.
 
-write(Fd,IMG) ->
+write(_Fd,_IMG) ->
     {error, bad_image}.
 
 

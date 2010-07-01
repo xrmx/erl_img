@@ -317,7 +317,7 @@ write(Fd, IMG) ->
     Palette = IMG#erl_image.palette,
     Background = attribute('Background',IMG#erl_image.attributes,0),
     AspectRatio = attribute('AspectRatio', IMG#erl_image.attributes,0),
-    if list(Palette) ->
+    if is_list(Palette) ->
 	    PLen = length(Palette),
 	    ColorRes = if PLen > 0, PLen =< 256 ->
 			       trunc(math:log(PLen)/math:log(2))+1;
@@ -388,7 +388,7 @@ write_image(Fd, Pm) ->
     Interlaced = attribute('Interlaced', Pm#erl_pixmap.attributes, 0),
     %% Special code for none compressed data!!!
     Inline     = attribute('Inline', Pm#erl_pixmap.attributes, 0),
-    if list(Palette) ->
+    if is_list(Palette) ->
 	    PLen = length(Palette),
 	    ColorRes = if PLen > 0, PLen =< 256 ->
 			       trunc(math:log(PLen)/math:log(2))+1;
