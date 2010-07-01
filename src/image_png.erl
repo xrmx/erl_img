@@ -5,7 +5,6 @@
 
 -module(image_png).
 
-
 -include_lib("erl_img/include/erl_img.hrl").
 -include("api.hrl").
 
@@ -206,7 +205,7 @@ txt([], _) ->
 
 %% read palette
 plte(<<R,G,B, Data/binary>>) ->
-    [{R*255,G*255,B*255} | plte(Data)];
+    [{R,G,B} | plte(Data)];
 plte(<<>>) -> [].
 
 %% IMPLEMENT This:
