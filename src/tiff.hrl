@@ -99,7 +99,7 @@
 -define(JPEGPointTransforms, 518).
 -define(JPEGQTables, 519).
 -define(JPEGDCTables, 520).
--define(JPEGACTables, 5201.
+-define(JPEGACTables, 5201).
 -define(YCbCrCoefficients, 529).
 -define(YCbCrSampling, 530).
 -define(YCbCrPositioning, 531).
