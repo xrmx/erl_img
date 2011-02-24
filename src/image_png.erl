@@ -5,7 +5,7 @@
 
 -module(image_png).
 
--include_lib("../include/erl_img.hrl").
+-include_lib("erl_img.hrl").
 -include("api.hrl").
 
 -include("dbg.hrl").
