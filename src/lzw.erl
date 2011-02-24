@@ -547,9 +547,9 @@ write(Code, CLen, {Totlen, List, Acc}) ->
     if
         NewLen rem 8 == 0 ->
             case buildbin(reverse([{CLen,Code}|List])) of
-                Bin when binary(Bin) ->
+                Bin when is_binary(Bin) ->
                     {0, [],[Bin|Acc]};
-                {Bin, NewList} when binary(Bin) ->
+                {Bin, NewList} when is_binary(Bin) ->
                     Sum = foldl(fun({X,_}, Sum) -> X + Sum end, 0, NewList),
                     {Sum,reverse(NewList),[Bin|Acc]}
             end;
