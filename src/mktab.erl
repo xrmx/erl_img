@@ -17,7 +17,7 @@ nib(N) -> (N-10)+$A.
 bin(N) ->
     bin(N,8,[]).
 
-bin(_N, 0, Acc) -> 
+bin(_N, 0, Acc) ->
     [$2,$#|Acc];
 bin(N, I, Acc) ->
     bin(N bsr 1, I-1, [$0+(N band 1) | Acc]).
@@ -26,14 +26,13 @@ bin(N, I, Acc) ->
 revbits(N) ->
     revbits(N,8,0).
 
-revbits(_N,0,A) -> 
+revbits(_N,0,A) ->
     A;
 revbits(N,I,A) ->
     revbits(N bsr 1,I-1,(A bsl 1) bor (N band 1)).
 
 start() ->
     lists:foreach(fun(I) ->
-			  io:format("	~s -> ~s;\n",
-				    [bin(I), bin(revbits(I))])
-		  end, lists:seq(0, 255)).
-
+                          io:format("   ~s -> ~s;\n",
+                                    [bin(I), bin(revbits(I))])
+                  end, lists:seq(0, 255)).

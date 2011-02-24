@@ -1,4 +1,4 @@
-%% File    : img_lzw.erl
+%%% File    : lzw.erl
 %%% Author  : Dan Gudmundsson
 %%%           Tony Rogvall <tony@bit.hemma.se>
 %%%
@@ -11,15 +11,15 @@
 -module(lzw).
 
 -export([decompress_tiff/1,
-	 decompress_tiff/3,
-	 decompress_gif/1,
-	 decompress_gif/2]).
+         decompress_tiff/3,
+         decompress_gif/1,
+         decompress_gif/2]).
 
 -export([compress/1,
-	 compress/2,
-	 compress/5,
-	 compress_gif/1,
-	 compress_gif/2]).
+         compress/2,
+         compress/5,
+         compress_gif/1,
+         compress_gif/2]).
 
 -export([rbits8/1, rbits/2]).
 -compile(export_all).
@@ -31,15 +31,15 @@
 -include("dbg.hrl").
 
 -record(z,
-	{
-	  clear,
-	  eoi,
-	  first,
-	  startlen,
-	  next,
-	  max,
-	  nextfn
-	 }).
+        {
+          clear,
+          eoi,
+          first,
+          startlen,
+          next,
+          max,
+          nextfn
+         }).
 
 -define(get_lzw(Code),      get(Code)).
 -define(add_lzw(Code, Str), put(Code, Str)).
@@ -63,7 +63,7 @@ read_bits_lsb(Bin, Offs, Len) ->
     Code = (BCode bsr R0) band ((1 bsl Len)-1),
     {Code,Offs1}.
 
-%% least significant bits and bytes first 
+%% least significant bits and bytes first
 read_bits_LSB(Bin, Offs, Len) ->
     {Code,Offs1} = read_bits_lsb(Bin,Offs,Len),
     {rbits(Code,Len),Offs1}.
@@ -73,7 +73,7 @@ read_bits_LSB(Bin, Offs, Len) ->
 init_decomp(Lim) ->
     erase(),
     init_decomp(0,Lim).
-    
+
 init_decomp(Lim,Lim) ->
     ok;
 init_decomp(I,Lim) ->
@@ -95,15 +95,15 @@ init_comp(I,Lim) ->
 %% needed for gif bit packing
 %%
 decompress_gif(Bin) ->
-    decompress_gif(Bin, 8). 
+    decompress_gif(Bin, 8).
 
 decompress_gif(Bin, MinCodeSize) ->
     ReadFn = fun(Len,Offs) ->
-		     read_bits_lsb(Bin,Offs,Len)
-	     end,
+                     read_bits_lsb(Bin,Offs,Len)
+             end,
     NextFn = fun(Len) -> (1 bsl Len) end,
     decomp(0,ReadFn,MinCodeSize,NextFn).
-    
+
 
 
 decompress_tiff(Bin) ->
@@ -111,14 +111,14 @@ decompress_tiff(Bin) ->
 
 decompress_tiff(Bin, MinCodeSize, 2) ->
     ReadFn = fun(Len,Offs) ->
-		     read_bits_LSB(Bin,Offs,Len)
-	     end,
+                     read_bits_LSB(Bin,Offs,Len)
+             end,
     NextFn = fun(Len) -> (1 bsl Len)-1 end,
     decomp(0,ReadFn,MinCodeSize,NextFn);
 decompress_tiff(Bin, MinCodeSize, 1) ->
     ReadFn = fun(Len,Offs) ->
-		     read_bits_msb(Bin,Offs,Len)
-	     end,    
+                     read_bits_msb(Bin,Offs,Len)
+             end,
     NextFn = fun(Len) -> (1 bsl Len)-1 end,
     decomp(0, ReadFn, MinCodeSize, NextFn).
 
@@ -127,13 +127,13 @@ decomp(S, Read, MinCodeSize, NextFn) ->
     First      = (1 bsl MinCodeSize)+2,
     StartLen   = MinCodeSize+1,
     Z = #z { clear    = (1 bsl MinCodeSize),
-	     eoi      = (1 bsl MinCodeSize)+1,
-	     first    = First,
-	     startlen = StartLen,
-	     next     = NextFn(StartLen),
-	     max      = 0,  %% not used here
-	     nextfn   = NextFn
-	    },
+             eoi      = (1 bsl MinCodeSize)+1,
+             first    = First,
+             startlen = StartLen,
+             next     = NextFn(StartLen),
+             max      = 0,  %% not used here
+             nextfn   = NextFn
+            },
     ?dbg("decomp: mincodesize=~p, z = ~p\n",[MinCodeSize, Z]),
     decomp(S,Read,0,First,StartLen,Z,[]).
 
@@ -144,45 +144,45 @@ decomp(S,Read,PrevCode,Count,BitLen,Z,Acc) when BitLen<12,Count == Z#z.next ->
     ?dbg("NEXT BITLEN=~p\n", [NextBitLen]),
     NextCode = (Z#z.nextfn)(NextBitLen),
     decomp(S, Read, PrevCode, Count, NextBitLen,
-	   Z#z { next = NextCode }, Acc);
+           Z#z { next = NextCode }, Acc);
 decomp(S,Read,PrevCode,Count,BitLen,Z,Acc) ->
     {NewCode,NS} = Read(BitLen,S),
     ?dbg("read: ~w/~w count=~w\n", [NewCode, BitLen,Count]),
     if NewCode == Z#z.eoi ->
-	    ?dbg("EOI:~p\n",[Z#z.eoi]),
+            ?dbg("EOI:~p\n",[Z#z.eoi]),
             list_to_binary(reverse(Acc));
        NewCode == Z#z.clear ->
-	    ?dbg("CLEAR:~p\n",[Z#z.clear]),
-	    init_decomp(Z#z.first),
-	    StartLen = Z#z.startlen,
+            ?dbg("CLEAR:~p\n",[Z#z.clear]),
+            init_decomp(Z#z.first),
+            StartLen = Z#z.startlen,
             {NewCode1,NS1} = Read(StartLen, NS),
-	    ?dbg("read: ~w/~w count=~w\n", [NewCode1,StartLen,Count]),
-	    if NewCode1 == Z#z.eoi ->
-		    list_to_binary(reverse(Acc));
-	       true ->
+            ?dbg("read: ~w/~w count=~w\n", [NewCode1,StartLen,Count]),
+            if NewCode1 == Z#z.eoi ->
+                    list_to_binary(reverse(Acc));
+               true ->
                     Str = ?get_lzw(NewCode1),
-		    NextCode = (Z#z.nextfn)(StartLen),
+                    NextCode = (Z#z.nextfn)(StartLen),
                     decomp(NS1,Read,NewCode1, Z#z.first, StartLen,
-			   Z#z { next = NextCode }, [Str|Acc])
-	    end;
+                           Z#z { next = NextCode }, [Str|Acc])
+            end;
        true ->
-	    ?dbg("CODE: prev=~p new=~p\n",[PrevCode,NewCode]),
+            ?dbg("CODE: prev=~p new=~p\n",[PrevCode,NewCode]),
             case ?get_lzw(NewCode) of
                 undefined ->
                     OldStr = [H|_] = ?get_lzw(PrevCode),
                     NewStr = OldStr ++ [H],
                     ?add_lzw(NewCode, NewStr),
-		    decomp(NS,Read,NewCode,Count+1,BitLen,Z,[NewStr|Acc]);
-		Str = [H|_]->
+                    decomp(NS,Read,NewCode,Count+1,BitLen,Z,[NewStr|Acc]);
+                Str = [H|_]->
                     ?add_lzw(Count, ?get_lzw(PrevCode) ++ [H]),
-		    decomp(NS,Read,NewCode,Count+1,BitLen,Z,[Str|Acc])
-	    end
+                    decomp(NS,Read,NewCode,Count+1,BitLen,Z,[Str|Acc])
+            end
     end.
 
 %% reverse bits in a byte
 rbits8(Code) ->
     case Code of
-	2#00000000 -> 2#00000000;
+        2#00000000 -> 2#00000000;
         2#00000001 -> 2#10000000;
         2#00000010 -> 2#01000000;
         2#00000011 -> 2#11000000;
@@ -443,11 +443,11 @@ rbits8(Code) ->
 rbits(Code, Len) ->
     rbits(Code, Len, 0).
 
-rbits(_Code, 0, Acc) -> 
+rbits(_Code, 0, Acc) ->
     Acc;
 rbits(Code, Len, Acc) when Len >= 8 ->
     rbits(Code bsr 8, Len - 8,
-	  (Acc bsl 8) bor rbits8(Code band 16#ff));
+          (Acc bsl 8) bor rbits8(Code band 16#ff));
 rbits(Code, Len, Acc) ->
     A8 = rbits8(Code band 16#ff),
     (Acc bsl Len) bor (A8 bsr (8 - Len)).
@@ -472,13 +472,13 @@ compress(Bin,Stripe,MinCodeSize,MaxCodeSize,NextFn) ->
     First      = (1 bsl MinCodeSize)+2,
     StartLen   = MinCodeSize+1,
     Z = #z { clear    = (1 bsl MinCodeSize),
-	     eoi      = (1 bsl MinCodeSize)+1,
-	     first    = First,
-	     startlen = StartLen,
-	     next     = NextFn(StartLen),
-	     max      = NextFn(MaxCodeSize+1),
-	     nextfn   = NextFn
-	    },
+             eoi      = (1 bsl MinCodeSize)+1,
+             first    = First,
+             startlen = StartLen,
+             next     = NextFn(StartLen),
+             max      = NextFn(MaxCodeSize+1),
+             nextfn   = NextFn
+            },
     ?dbg("compress: mincodesize=~w, z=~w\n",[MinCodeSize,Z]),
     comp0(Bin,Stripe,StartLen,Z,{0,[],[]}).
 
@@ -495,22 +495,22 @@ comp1(<<>>,_CC,_Stripe,Omega,BitLen,_Count,Z,Build) ->
     {TotBitLen,Codes, Acc} = write(Z#z.eoi, BitLen, NBuild),
     PaddL = 8 - (TotBitLen rem 8),
     Bin = if PaddL == 8 ->
-		  buildbin(reverse(Codes));
-	     true ->
-		  buildbin(reverse([{PaddL, 0}|Codes]))
-	  end,
+                  buildbin(reverse(Codes));
+             true ->
+                  buildbin(reverse([{PaddL, 0}|Codes]))
+          end,
     {Z#z.startlen-1, list_to_binary(reverse([Bin|Acc]))};
 
 comp1(Bin,CC,Stripe,Omega,BitLen,Count,Z,Build) when CC == Stripe ->
     Code =?get_lzw(Omega),
     NBuild = write(Code, BitLen, Build),
     if Count+2 == Z#z.next ->
-	    BitLen1 = BitLen+1,
-	    NextCode = (Z#z.nextfn)(BitLen1),
-	    Z1 = Z#z { next = NextCode },
-	    comp0(Bin,Stripe,BitLen1,Z1,NBuild);
+            BitLen1 = BitLen+1,
+            NextCode = (Z#z.nextfn)(BitLen1),
+            Z1 = Z#z { next = NextCode },
+            comp0(Bin,Stripe,BitLen1,Z1,NBuild);
        true ->
-	    comp0(Bin,Stripe,BitLen,Z,NBuild)
+            comp0(Bin,Stripe,BitLen,Z,NBuild)
     end;
 
 comp1(<<Char:8, Bin/binary>>,CC,Stripe,Omega,BitLen,Count,Z,Build) ->
@@ -520,22 +520,22 @@ comp1(<<Char:8, Bin/binary>>,CC,Stripe,Omega,BitLen,Count,Z,Build) ->
             Code = ?get_lzw(Omega),
             NBuild = write(Code,BitLen,Build),
             ?add_lzw(NewOmega, Count),
-	    if Count+2 == Z#z.next ->
-		    BitLen1 = BitLen+1,
-		    NextCode = (Z#z.nextfn)(BitLen1),
-		    Z1 = Z#z { next = NextCode },
-		    if Z#z.next == Z#z.max ->
-			    Code2 =?get_lzw([Char]),
-			    NBuild2 = write(Code2,BitLen,NBuild),
-			    comp0(Bin,Stripe,BitLen1,Z1,NBuild2);
-		       true ->
-			    comp1(Bin,CC+1,Stripe,[Char],BitLen1,
-				  Count+1,Z1,NBuild)
-		    end;
-	       true ->
-		    comp1(Bin,CC+1,Stripe,[Char],BitLen,
-			  Count+1,Z,NBuild)
-	    end;
+            if Count+2 == Z#z.next ->
+                    BitLen1 = BitLen+1,
+                    NextCode = (Z#z.nextfn)(BitLen1),
+                    Z1 = Z#z { next = NextCode },
+                    if Z#z.next == Z#z.max ->
+                            Code2 =?get_lzw([Char]),
+                            NBuild2 = write(Code2,BitLen,NBuild),
+                            comp0(Bin,Stripe,BitLen1,Z1,NBuild2);
+                       true ->
+                            comp1(Bin,CC+1,Stripe,[Char],BitLen1,
+                                  Count+1,Z1,NBuild)
+                    end;
+               true ->
+                    comp1(Bin,CC+1,Stripe,[Char],BitLen,
+                          Count+1,Z,NBuild)
+            end;
         _ ->
             comp1(Bin,CC+1,Stripe,NewOmega,BitLen,Count,Z,Build)
     end.
@@ -544,7 +544,7 @@ comp1(<<Char:8, Bin/binary>>,CC,Stripe,Omega,BitLen,Count,Z,Build) ->
 write(Code, CLen, {Totlen, List, Acc}) ->
     ?dbg("write: ~w/~w\n", [Code, CLen]),
     NewLen = CLen + Totlen,
-    if 
+    if
         NewLen rem 8 == 0 ->
             case buildbin(reverse([{CLen,Code}|List])) of
                 Bin when binary(Bin) ->
@@ -552,12 +552,12 @@ write(Code, CLen, {Totlen, List, Acc}) ->
                 {Bin, NewList} when binary(Bin) ->
                     Sum = foldl(fun({X,_}, Sum) -> X + Sum end, 0, NewList),
                     {Sum,reverse(NewList),[Bin|Acc]}
-	    end;
+            end;
 
         NewLen > 100 ->
             {Bin,NewList} = buildbin(reverse([{CLen,Code}|List])),
-	    Sum = foldl(fun({X,_}, Sum) -> X + Sum end, 0, NewList),
-	    {Sum,reverse(NewList),[Bin|Acc]};
+            Sum = foldl(fun({X,_}, Sum) -> X + Sum end, 0, NewList),
+            {Sum,reverse(NewList),[Bin|Acc]};
 
         true ->
             {Totlen+CLen,[{CLen,Code}|List], Acc}
@@ -580,18 +580,15 @@ buildbin([{L1,C1},{L2,C2},{L3,C3},{L4,C4},{L5,C5},{L6,C6},{L7,C7}]) ->
 buildbin([{L1,C1},{L2,C2},{L3,C3},{L4,C4},{L5,C5},{L6,C6},{L7,C7},{L8,C8}]) ->
     <<C1:L1,C2:L2,C3:L3,C4:L4,C5:L5,C6:L6,C7:L7,C8:L8>>;
 buildbin([{L1,C1},{L2,C2},{L3,C3},{L4,C4},{L5,C5},
-	  {L6,C6},{L7,C7},{L8,C8},{L9,C9} | Rest]) ->
+          {L6,C6},{L7,C7},{L8,C8},{L9,C9} | Rest]) ->
     RemL = (L1+L2+L3+L4+L5+L6+L7+L8) rem 8,
     AddL = 8 - RemL,
     KeepL = L9 - AddL,
     SkipL = 16 - (AddL + KeepL),
-    TempFill = 8 - (L9 rem 8),    
+    TempFill = 8 - (L9 rem 8),
     <<P9:AddL,Keep9:KeepL, _:SkipL>> = <<C9:L9,0:TempFill>>,
     Bin = <<C1:L1,C2:L2,C3:L3,C4:L4,C5:L5,C6:L6,C7:L7,C8:L8,P9:AddL>>,
     NewList = [{KeepL, Keep9}|Rest],
     {Bin, NewList};
 buildbin([]) ->
     <<>>.
-
-
-

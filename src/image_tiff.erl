@@ -1,4 +1,4 @@
-%%% File    : img_tif.erl
+%%% File    : image_tif.erl
 %%% Author  : Tony Rogvall <tony@a55.hemma.se>
 %%% Description : TIFF image format
 %%% Created :  6 Mar 2003 by Tony Rogvall <tony@a55.hemma.se>
@@ -29,58 +29,58 @@ magic(<<?MM:16,?MAGIC:16/big,_Offset:32/big,_/binary>>) -> true;
 magic(_) -> false.
 
 mime_type() -> "image/tiff".
-    
+
 extensions() -> [".tiff", ".tif" ].
 
 
 read_info(Fd) ->
     case scan_fd(Fd, fun collect_fun/3, #erl_image { type = ?MODULE }) of
-	{ok, IMG} ->
-	    Bps = erl_img:attribute(IMG, 'BitsPerSample'),
-	    Xs  = erl_img:attribute(IMG,'ExtraSamples',[]),
-	    Format = 
-		case erl_img:attribute(IMG, 'PhotoMetricInterpretation') of
-		    [0] ->
-			case Bps of
-			    [4] -> gray4;
-			    [8] -> gray8
-			end;
-		    [1] ->
-			case Bps of
-			    [4] -> gray4;
-			    [8] -> gray8
-			end;
-		    [2] ->
-			case Bps of
-			    [8,8,8] ->
-				case Xs of
-				    []  ->  r8g8b8;
-				    [_] -> r8g8b8a8
-				end;
-			    [8,8,8,8] ->
-				r8g8b8a8
-			end;
-		    [3] ->
-			case Bps of
-			    [4] -> palette4;
-			    [8] -> palette8
-			end
-		end,
-	    {ok, IMG#erl_image { format = Format }};
-	Error -> 
-	    Error
+        {ok, IMG} ->
+            Bps = erl_img:attribute(IMG, 'BitsPerSample'),
+            Xs  = erl_img:attribute(IMG,'ExtraSamples',[]),
+            Format =
+                case erl_img:attribute(IMG, 'PhotoMetricInterpretation') of
+                    [0] ->
+                        case Bps of
+                            [4] -> gray4;
+                            [8] -> gray8
+                        end;
+                    [1] ->
+                        case Bps of
+                            [4] -> gray4;
+                            [8] -> gray8
+                        end;
+                    [2] ->
+                        case Bps of
+                            [8,8,8] ->
+                                case Xs of
+                                    []  ->  r8g8b8;
+                                    [_] -> r8g8b8a8
+                                end;
+                            [8,8,8,8] ->
+                                r8g8b8a8
+                        end;
+                    [3] ->
+                        case Bps of
+                            [4] -> palette4;
+                            [8] -> palette8
+                        end
+                end,
+            {ok, IMG#erl_image { format = Format }};
+        Error ->
+            Error
     end.
-		    
+
 
 write_info(_Fd, _IMG) ->
     ok.
 
 read(Fd, IMG) ->
-    read(Fd, IMG, 
-	 fun(_, Row, Ri, St) ->
-		 ?dbg("tiff: load row ~p\n", [Ri]),
-		 [{Ri,Row}|St] end, 
-	 []).
+    read(Fd, IMG,
+         fun(_, Row, Ri, St) ->
+                 ?dbg("tiff: load row ~p\n", [Ri]),
+                 [{Ri,Row}|St] end,
+         []).
 
 
 read(Fd,IMG, RowFun, St0) ->
@@ -90,72 +90,72 @@ read(Fd,IMG, RowFun, St0) ->
     [Predict]     = erl_img:attribute(IMG, 'Predictor', [0]),
     [FillOrder]   = erl_img:attribute(IMG, 'FillOrder', [1]),
     {SampleOrder,Y0,Ys} = case erl_img:attribute(IMG, 'Orientation', [1]) of
-			      [1] -> {left_to_right, 0, 1};
-			      [2] -> {right_to_left, 0, 1};
-			      [3] -> {right_to_left, IMG#erl_image.height-1,-1};
-			      [4] -> {left_to_right, IMG#erl_image.height-1,-1}
-			end,
+                              [1] -> {left_to_right, 0, 1};
+                              [2] -> {right_to_left, 0, 1};
+                              [3] -> {right_to_left, IMG#erl_image.height-1,-1};
+                              [4] -> {left_to_right, IMG#erl_image.height-1,-1}
+                        end,
     BytesPerRow = (IMG#erl_image.depth div 8) * IMG#erl_image.width,
     ?dbg("BytesPerRow = ~p\n", [BytesPerRow]),
     IMG1 = IMG#erl_image { order = SampleOrder },
     PIX = #erl_pixmap { width = IMG1#erl_image.width,
-			height = IMG1#erl_image.height,
-			format = IMG1#erl_image.format },
+                        height = IMG1#erl_image.height,
+                        format = IMG1#erl_image.format },
     case read_strips(Fd,PIX,RowFun,St0,Y0,Ys,BytesPerRow,
-		     Compression, Predict, FillOrder,SOffset,SCount) of
-	{ok, PIX1} ->
-	    {ok, IMG1#erl_image { pixmaps = [PIX1]}};
-	Error ->
-	    Error
+                     Compression, Predict, FillOrder,SOffset,SCount) of
+        {ok, PIX1} ->
+            {ok, IMG1#erl_image { pixmaps = [PIX1]}};
+        Error ->
+            Error
     end.
 
 
 read_strips(_Fd,PIX,_RowFun,St0,_Ri,_Rs,
-	    _BytesPerRow,_Compression, _Predict, _Fill, [], []) ->
+            _BytesPerRow,_Compression, _Predict, _Fill, [], []) ->
     {ok, PIX#erl_pixmap { pixels = St0 }};
 read_strips(Fd,PIX,RowFun,St0,Ri,Rs,
-	    BytesPerRow,Compression, Predict, Fill,
-	    [Offs|SOffset], [Size|SCount]) ->
+            BytesPerRow,Compression, Predict, Fill,
+            [Offs|SOffset], [Size|SCount]) ->
     case file:pread(Fd,Offs,Size) of
-	{ok,Bin} ->
-	    case Compression of
-		1 -> %% no compression
-		    {St1,Rj} = split_strip(PIX,Bin,BytesPerRow,
-					   RowFun,St0,Ri,Rs),
-		    read_strips(Fd,PIX,RowFun,St1,Rj,Rs,BytesPerRow,
-				Compression,Predict,Fill,SOffset,SCount);
+        {ok,Bin} ->
+            case Compression of
+                1 -> %% no compression
+                    {St1,Rj} = split_strip(PIX,Bin,BytesPerRow,
+                                           RowFun,St0,Ri,Rs),
+                    read_strips(Fd,PIX,RowFun,St1,Rj,Rs,BytesPerRow,
+                                Compression,Predict,Fill,SOffset,SCount);
 
-		5 -> %% lzw compression
-		    Bin1 = lzw:decompress_tiff(Bin, 8, Fill),
-		    Bin2 = undo_differencing(Bin1, Predict,
-					     PIX#erl_pixmap.format,
-					     PIX#erl_pixmap.width),
-		    {St1,Rj} = split_strip(PIX,Bin2,BytesPerRow,
-					   RowFun,St0,Ri,Rs),
-		    read_strips(Fd,PIX,RowFun,St1,Rj,Rs,BytesPerRow,
-				Compression, Predict, Fill, SOffset, SCount);
-		
-		32773 ->
-		    Bin1 = unpack_bits(Bin),
-		    {St1,Rj} = split_strip(PIX,Bin1,BytesPerRow,
-					   RowFun,St0,Ri,Rs),
-		    read_strips(Fd,PIX,RowFun,St1,Rj,Rs,BytesPerRow,
-				Compression, Predict, Fill, SOffset, SCount);
-		_ ->
-		    {error, {unknown_compression,Compression}}
-	    end;
-	Error ->
-	    Error
+                5 -> %% lzw compression
+                    Bin1 = lzw:decompress_tiff(Bin, 8, Fill),
+                    Bin2 = undo_differencing(Bin1, Predict,
+                                             PIX#erl_pixmap.format,
+                                             PIX#erl_pixmap.width),
+                    {St1,Rj} = split_strip(PIX,Bin2,BytesPerRow,
+                                           RowFun,St0,Ri,Rs),
+                    read_strips(Fd,PIX,RowFun,St1,Rj,Rs,BytesPerRow,
+                                Compression, Predict, Fill, SOffset, SCount);
+
+                32773 ->
+                    Bin1 = unpack_bits(Bin),
+                    {St1,Rj} = split_strip(PIX,Bin1,BytesPerRow,
+                                           RowFun,St0,Ri,Rs),
+                    read_strips(Fd,PIX,RowFun,St1,Rj,Rs,BytesPerRow,
+                                Compression, Predict, Fill, SOffset, SCount);
+                _ ->
+                    {error, {unknown_compression,Compression}}
+            end;
+        Error ->
+            Error
     end.
 
 
 split_strip(PIX,Strip,RowWidth,RowFun,St0,Ri,Rs) ->
     case Strip of
-	<<Row:RowWidth/binary, Tail/binary>> ->
-	    St1 = RowFun(PIX,Row,Ri,St0),
-	    split_strip(PIX,Tail,RowWidth,RowFun,St1,Ri+Rs,Rs);
-	_ ->
-	    {St0,Ri}
+        <<Row:RowWidth/binary, Tail/binary>> ->
+            St1 = RowFun(PIX,Row,Ri,St0),
+            split_strip(PIX,Tail,RowWidth,RowFun,St1,Ri+Rs,Rs);
+        _ ->
+            {St0,Ri}
     end.
 
 
@@ -168,33 +168,33 @@ collect_fun(_Fd, T, St) ->
     Value = T#tiff_entry.value,
     As = [{Key,Value} | St#erl_image.attributes],
     case Key of
-	'ImageWidth' ->
-	    [Width] = Value,
-	    St#erl_image { width = Width, attributes = As };
-	'ImageLength' ->
-	    [Length] = Value,
-	    St#erl_image { height = Length, attributes = As };
-	'BitsPerSample' ->
-	    St#erl_image { depth = lists:sum(Value), attributes = As };
-	'ImageDescription' ->
-	    St#erl_image { comment = Value, attributes = As };
-	'DateTime' ->
-	    [V] = Value,
-	    case string:tokens(V, ": ") of
-		[YYYY,MM,DD,H,M,S] ->
-		    DateTime = {{list_to_integer(YYYY),
-				 list_to_integer(MM),
-				 list_to_integer(DD)},
-				{list_to_integer(H),
-				 list_to_integer(M),
-				 list_to_integer(S)}},
-		    St#erl_image { itime = DateTime, attributes = As };
-		_ ->
-		    St#erl_image { attributes = As }
-	    end;
+        'ImageWidth' ->
+            [Width] = Value,
+            St#erl_image { width = Width, attributes = As };
+        'ImageLength' ->
+            [Length] = Value,
+            St#erl_image { height = Length, attributes = As };
+        'BitsPerSample' ->
+            St#erl_image { depth = lists:sum(Value), attributes = As };
+        'ImageDescription' ->
+            St#erl_image { comment = Value, attributes = As };
+        'DateTime' ->
+            [V] = Value,
+            case string:tokens(V, ": ") of
+                [YYYY,MM,DD,H,M,S] ->
+                    DateTime = {{list_to_integer(YYYY),
+                                 list_to_integer(MM),
+                                 list_to_integer(DD)},
+                                {list_to_integer(H),
+                                 list_to_integer(M),
+                                 list_to_integer(S)}},
+                    St#erl_image { itime = DateTime, attributes = As };
+                _ ->
+                    St#erl_image { attributes = As }
+            end;
 
-	_ ->
-	    St#erl_image { attributes = As }
+        _ ->
+            St#erl_image { attributes = As }
     end.
 
 
@@ -212,48 +212,48 @@ dump_file(File) ->
 
 scan_file(File, Callback, St) ->
     case file:open(File, [raw, binary, read]) of
-	{ok,Fd} ->
-	    Res = scan_fd(Fd, Callback, St),
-	    file:close(Fd),
-	    Res;
-	Error ->
-	    Error
-    end.	
+        {ok,Fd} ->
+            Res = scan_fd(Fd, Callback, St),
+            file:close(Fd),
+            Res;
+        Error ->
+            Error
+    end.
 
 scan_binary(Bin, Callback, St) ->
     case file:open(Bin, [ram, binary, read]) of
-	{ok,Fd} ->
-	    Res = scan_fd(Fd, Callback, St),
-	    file:close(Fd),
-	    Res;
-	Error ->
-	    Error
+        {ok,Fd} ->
+            Res = scan_fd(Fd, Callback, St),
+            file:close(Fd),
+            Res;
+        Error ->
+            Error
     end.
 
 
 scan_fd(Fd, Callback, St) ->
     case file:read(Fd, 8) of
-	{ok, <<?II:16,?MAGIC:16/little,Offset:32/little>>} ->
-	    %% io:format("TIFF: LITTLE endian\n"),
-	    scan_ifd(Fd, [$0], Offset, little, Callback, St);
-	{ok, <<?MM:16,?MAGIC:16/big,Offset:32/big>>} ->
-	    %% io:format("TIFF: BIG endian\n"),
-	    scan_ifd(Fd, [$0], Offset, big, Callback, St);
-	{ok,_} ->
-	    {error, bad_magic};
-	Error -> 
-	    Error
+        {ok, <<?II:16,?MAGIC:16/little,Offset:32/little>>} ->
+            %% io:format("TIFF: LITTLE endian\n"),
+            scan_ifd(Fd, [$0], Offset, little, Callback, St);
+        {ok, <<?MM:16,?MAGIC:16/big,Offset:32/big>>} ->
+            %% io:format("TIFF: BIG endian\n"),
+            scan_ifd(Fd, [$0], Offset, big, Callback, St);
+        {ok,_} ->
+            {error, bad_magic};
+        Error ->
+            Error
     end.
 
 %% Scan entry point for special Exif/MakerNote
 scan_ifd_bin(Bin, IFD, Offset, Endian, Callback, St) ->
     case file:open(Bin, [ram, binary, read]) of
-	{ok,Fd} ->
-	    Res = scan_ifd(Fd, IFD, Offset, Endian, Callback, St),
-	    file:close(Fd),
-	    Res;
-	Error ->
-	    Error
+        {ok,Fd} ->
+            Res = scan_ifd(Fd, IFD, Offset, Endian, Callback, St),
+            file:close(Fd),
+            Res;
+        Error ->
+            Error
     end.
 
 scan_ifd(_Fd, _IFD, 0, _Endian, _Callback, St) ->
@@ -261,77 +261,77 @@ scan_ifd(_Fd, _IFD, 0, _Endian, _Callback, St) ->
 scan_ifd(Fd, IFD, Offset, Endian, Callback,St) ->
     file:position(Fd, Offset),
     case read_u16(Fd,Endian) of
-	{ok,N} ->
-	    scan_entries(Fd, IFD, Endian, N, Callback, St);
-	Error -> Error
+        {ok,N} ->
+            scan_entries(Fd, IFD, Endian, N, Callback, St);
+        Error -> Error
     end.
 
 scan_entries(Fd, [I|IFD], Endian, 0, Callback, St) ->
     case read_u32(Fd,Endian) of
-	{ok,Offset} ->
-	    scan_ifd(Fd,[I+1|IFD],Offset,Endian,Callback,St);
-	Error -> Error
+        {ok,Offset} ->
+            scan_ifd(Fd,[I+1|IFD],Offset,Endian,Callback,St);
+        Error -> Error
     end;
 scan_entries(Fd, IFD, Endian, I, Callback,St) ->
     case read_entry(Fd,Endian) of
-	{ok,{Tag,Type,N,Data}} ->
-	    TiffTag = 
-		case is_value(Type, N) of
-		    true ->
-			Value = decode_value(Type,Endian,N,Data),
-			#tiff_entry { ifd = IFD, 
-				      tag = Tag, 
-				      endian = Endian,
-				      type = Type, 
-				      value = Value };
-		    false ->
-			Offset = if Endian == little ->
-					 <<Offs:32/little>> = Data, Offs;
-				    true ->
-					 <<Offs:32/big>> = Data, Offs
-				 end,
-			Value = decode_offs_value(Fd,Offset,Type,Endian,N),
-			#tiff_entry { ifd = IFD, 
-				      tag = Tag, 
-				      endian = Endian,
-				      type = Type, 
-				      offs = Offset,
-				      value = Value }
-		end,
-	    %% Save file position inorder to allwo callback to parse Sub ifd's
-	    {ok,Save} = file:position(Fd, cur),
-	    St1 = Callback(Fd, TiffTag, St),
-	    file:position(Fd, Save),
-	    scan_entries(Fd, IFD, Endian, I-1, Callback, St1);
-	Error -> Error
+        {ok,{Tag,Type,N,Data}} ->
+            TiffTag =
+                case is_value(Type, N) of
+                    true ->
+                        Value = decode_value(Type,Endian,N,Data),
+                        #tiff_entry { ifd = IFD,
+                                      tag = Tag,
+                                      endian = Endian,
+                                      type = Type,
+                                      value = Value };
+                    false ->
+                        Offset = if Endian == little ->
+                                         <<Offs:32/little>> = Data, Offs;
+                                    true ->
+                                         <<Offs:32/big>> = Data, Offs
+                                 end,
+                        Value = decode_offs_value(Fd,Offset,Type,Endian,N),
+                        #tiff_entry { ifd = IFD,
+                                      tag = Tag,
+                                      endian = Endian,
+                                      type = Type,
+                                      offs = Offset,
+                                      value = Value }
+                end,
+            %% Save file position inorder to allwo callback to parse Sub ifd's
+            {ok,Save} = file:position(Fd, cur),
+            St1 = Callback(Fd, TiffTag, St),
+            file:position(Fd, Save),
+            scan_entries(Fd, IFD, Endian, I-1, Callback, St1);
+        Error -> Error
     end.
 
 read_u16(Fd, Endian) ->
     case file:read(Fd, 2) of
-	{ok, <<N:16/little>>} when Endian == little ->  {ok, N};
-	{ok, <<N:16/big>>} when Endian == big       ->  {ok, N};
-	{ok, _} -> {error, truncated};
-	Error -> Error
+        {ok, <<N:16/little>>} when Endian == little ->  {ok, N};
+        {ok, <<N:16/big>>} when Endian == big       ->  {ok, N};
+        {ok, _} -> {error, truncated};
+        Error -> Error
     end.
 
 read_u32(Fd, Endian) ->
     case file:read(Fd, 4) of
-	{ok, <<N:32/little>>} when Endian == little ->  {ok, N};
-	{ok, <<N:32/big>>} when Endian == big       ->  {ok, N};
-	{ok, _} -> {error, truncated};
-	Error -> Error
+        {ok, <<N:32/little>>} when Endian == little ->  {ok, N};
+        {ok, <<N:32/big>>} when Endian == big       ->  {ok, N};
+        {ok, _} -> {error, truncated};
+        Error -> Error
     end.
 
 read_entry(Fd,Endian) ->
     case file:read(Fd,12) of
-	{ok,<<Tag:16/little,T:16/little,N:32/little,V:4/binary>>} when 
-	      Endian == little ->
-	    {ok,{Tag,decode_type(T),N,V}};
-	{ok,<<Tag:16/big,T:16/big,N:32/big,V:4/binary>>} when 
-	      Endian == big ->
-	    {ok,{Tag,decode_type(T),N,V}};
-	{ok,_} -> {error, truncated};
-	Error -> Error
+        {ok,<<Tag:16/little,T:16/little,N:32/little,V:4/binary>>} when
+              Endian == little ->
+            {ok,{Tag,decode_type(T),N,V}};
+        {ok,<<Tag:16/big,T:16/big,N:32/big,V:4/binary>>} when
+              Endian == big ->
+            {ok,{Tag,decode_type(T),N,V}};
+        {ok,_} -> {error, truncated};
+        Error -> Error
     end.
 
 
@@ -352,81 +352,81 @@ decode_type(_) -> unknown.
 
 decode_tag(Tag) ->
     case Tag of
-	?NewSubfileType -> 'NewSubfileType';
-	?SubfileType -> 'SubfileType';
-	?ImageWidth -> 'ImageWidth';
-	?ImageLength -> 'ImageLength';
-	?BitsPerSample -> 'BitsPerSample';
-	?Compression -> 'Compression';
-	?PhotoMetricInterpretation -> 'PhotoMetricInterpretation';
-	?Threshholding -> 'Threshholding';
-	?CellWidth -> 'CellWidth';
-	?CellLength -> 'CellLength';
-	?FillOrder -> 'FillOrder';
-	?DocumentName -> 'DocumentName';
-	?ImageDescription -> 'ImageDescription';
-	?Make -> 'Make';
-	?Model -> 'Model';
-	?StripOffset -> 'StripOffset';
-	?Orientation -> 'Orientation';
-	?SamplesPerPixel -> 'SamplesPerPixel';
-	?RowsPerStrip -> 'RowsPerStrip';
-	?StripByteCounts -> 'StripByteCounts';
-	?MinSampleValue -> 'MinSampleValue';
-	?MaxSampleValue -> 'MaxSampleValue';
-	?XResolution -> 'XResolution';
-	?YResolution -> 'YResolution';
-	?PlanarConfiguration -> 'PlanarConfiguration';
-	?PageName -> 'PageName';
-	?XPosition -> 'XPosition';
-	?YPosition -> 'YPosition';
-	?FreeOffsets -> 'FreeOffsets';
-	?FreeByteCounts -> 'FreeByteCounts';
-	?GrayResponseUnit -> 'GrayResponseUnit';
-	?GrayResponseCurve -> 'GrayResponseCurve';
-	?T4Options -> 'T4Options';
-	?T6Options -> 'T6Options';
-	?ResolutionUnit -> 'ResolutionUnit';
-	?PageNumber -> 'PageNumber';
-	?TransferFunction -> 'TransferFunction';
-	?Software -> 'Software';
-	?DateTime -> 'DateTime';
-	?Artist -> 'Artist';
-	?HostComputer -> 'HostComputer';
-	?Predictor -> 'Predictor';
-	?WhitePoint -> 'WhitePoint';
-	?PrimaryChromaticities -> 'PrimaryChromaticities';
-	?ColorMap -> 'ColorMap';
-	?HalftoneHints -> 'HalftoneHints';
-	?TileWidth -> 'TileWidth';
-	?TileLength -> 'TileLength';
-	?TileOffset -> 'TileOffset';
-	?TileByteCounts -> 'TileByteCounts';
-	?InkSet -> 'InkSet';
-	?InkNames -> 'InkNames';
-	?NumberOfInks -> 'NumberOfInks';
-	?DotRange -> 'DotRange';
-	?TargetPrinter -> 'TargetPrinter';
-	?ExtraSamples -> 'ExtraSamples';
-	?SampleFormat -> 'SampleFormat';
-	?SMinSampleValue -> 'SMinSampleValue';
-	?SMaxSampleValue -> 'SMaxSampleValue';
-	?TransferRange -> 'TransferRange';
-	?JPEGProc -> 'JPEGProc';
-	?JPEGInterchangeFormat -> 'JPEGInterchangeFormat';
-	?JPEGInterchangeFormatLength -> 'JPEGInterchangeFormatLength';
-	?JPEGRestartInterval -> 'JPEGRestartInterval';
-	?JPEGLosslessPredictors -> 'JPEGLosslessPredictors';
-	?JPEGPointTransforms -> 'JPEGPointTransforms';
-	?JPEGQTables -> 'JPEGQTables';
-	?JPEGDCTables -> 'JPEGDCTables';
-	?JPEGACTables -> 'JPEGACTables';
-	?YCbCrCoefficients -> 'YCbCrCoefficients';
-	?YCbCrSampling -> 'YCbCrSampling';
-	?YCbCrPositioning -> 'YCbCrPositioning';
-	?ReferenceBlackWhite -> 'ReferenceBlackWhite';
-	?Copyright -> 'Copyright';
-	_ -> Tag
+        ?NewSubfileType -> 'NewSubfileType';
+        ?SubfileType -> 'SubfileType';
+        ?ImageWidth -> 'ImageWidth';
+        ?ImageLength -> 'ImageLength';
+        ?BitsPerSample -> 'BitsPerSample';
+        ?Compression -> 'Compression';
+        ?PhotoMetricInterpretation -> 'PhotoMetricInterpretation';
+        ?Threshholding -> 'Threshholding';
+        ?CellWidth -> 'CellWidth';
+        ?CellLength -> 'CellLength';
+        ?FillOrder -> 'FillOrder';
+        ?DocumentName -> 'DocumentName';
+        ?ImageDescription -> 'ImageDescription';
+        ?Make -> 'Make';
+        ?Model -> 'Model';
+        ?StripOffset -> 'StripOffset';
+        ?Orientation -> 'Orientation';
+        ?SamplesPerPixel -> 'SamplesPerPixel';
+        ?RowsPerStrip -> 'RowsPerStrip';
+        ?StripByteCounts -> 'StripByteCounts';
+        ?MinSampleValue -> 'MinSampleValue';
+        ?MaxSampleValue -> 'MaxSampleValue';
+        ?XResolution -> 'XResolution';
+        ?YResolution -> 'YResolution';
+        ?PlanarConfiguration -> 'PlanarConfiguration';
+        ?PageName -> 'PageName';
+        ?XPosition -> 'XPosition';
+        ?YPosition -> 'YPosition';
+        ?FreeOffsets -> 'FreeOffsets';
+        ?FreeByteCounts -> 'FreeByteCounts';
+        ?GrayResponseUnit -> 'GrayResponseUnit';
+        ?GrayResponseCurve -> 'GrayResponseCurve';
+        ?T4Options -> 'T4Options';
+        ?T6Options -> 'T6Options';
+        ?ResolutionUnit -> 'ResolutionUnit';
+        ?PageNumber -> 'PageNumber';
+        ?TransferFunction -> 'TransferFunction';
+        ?Software -> 'Software';
+        ?DateTime -> 'DateTime';
+        ?Artist -> 'Artist';
+        ?HostComputer -> 'HostComputer';
+        ?Predictor -> 'Predictor';
+        ?WhitePoint -> 'WhitePoint';
+        ?PrimaryChromaticities -> 'PrimaryChromaticities';
+        ?ColorMap -> 'ColorMap';
+        ?HalftoneHints -> 'HalftoneHints';
+        ?TileWidth -> 'TileWidth';
+        ?TileLength -> 'TileLength';
+        ?TileOffset -> 'TileOffset';
+        ?TileByteCounts -> 'TileByteCounts';
+        ?InkSet -> 'InkSet';
+        ?InkNames -> 'InkNames';
+        ?NumberOfInks -> 'NumberOfInks';
+        ?DotRange -> 'DotRange';
+        ?TargetPrinter -> 'TargetPrinter';
+        ?ExtraSamples -> 'ExtraSamples';
+        ?SampleFormat -> 'SampleFormat';
+        ?SMinSampleValue -> 'SMinSampleValue';
+        ?SMaxSampleValue -> 'SMaxSampleValue';
+        ?TransferRange -> 'TransferRange';
+        ?JPEGProc -> 'JPEGProc';
+        ?JPEGInterchangeFormat -> 'JPEGInterchangeFormat';
+        ?JPEGInterchangeFormatLength -> 'JPEGInterchangeFormatLength';
+        ?JPEGRestartInterval -> 'JPEGRestartInterval';
+        ?JPEGLosslessPredictors -> 'JPEGLosslessPredictors';
+        ?JPEGPointTransforms -> 'JPEGPointTransforms';
+        ?JPEGQTables -> 'JPEGQTables';
+        ?JPEGDCTables -> 'JPEGDCTables';
+        ?JPEGACTables -> 'JPEGACTables';
+        ?YCbCrCoefficients -> 'YCbCrCoefficients';
+        ?YCbCrSampling -> 'YCbCrSampling';
+        ?YCbCrPositioning -> 'YCbCrPositioning';
+        ?ReferenceBlackWhite -> 'ReferenceBlackWhite';
+        ?Copyright -> 'Copyright';
+        _ -> Tag
     end.
 
 
@@ -460,12 +460,12 @@ sizeof(_)         -> 0.
 decode_offs_value(Fd,Offset,Type,Endian,N) ->
     Sz = sizeof(Type)*N,
     case file:pread(Fd, Offset, Sz) of
-	{ok,Bin} when size(Bin) == Sz ->
-	    decode_value(Type,Endian,N,Bin);
-	{ok,_} ->
-	    {error, truncated};
-	Error ->
-	    Error
+        {ok,Bin} when size(Bin) == Sz ->
+            decode_value(Type,Endian,N,Bin);
+        {ok,_} ->
+            {error, truncated};
+        Error ->
+            Error
     end.
 
 decode_value(_,_,0,_) -> [];
@@ -486,8 +486,8 @@ decode_value(sshort,little,I,<<V:16/signed-little,VT/binary>>) ->
 decode_value(slong,little,I,<<V:32/signed-little,VT/binary>>) ->
     [V|decode_value(slong, little,I-1,VT)];
 
-decode_value(srational,little,I, 
-	     <<N:32/signed-little,D:32/signed-little,VT/binary>>) ->
+decode_value(srational,little,I,
+             <<N:32/signed-little,D:32/signed-little,VT/binary>>) ->
     [{N,D}|decode_value(srational,little,I-1,VT)];
 
 decode_value(float,little,I,<<V:32/little-float,VT/binary>>) ->
@@ -525,8 +525,8 @@ decode_value(double,big,I,<<V:64/big-float,VT/binary>>) ->
 decode_value(sbyte,_Endian,N,Bin) ->
     <<V:N/binary,_/binary>> = Bin,
     map(fun(I) when I >= 16#80 -> I - 16#100;
-	   (I) -> I
-	end, binary_to_list(V));
+           (I) -> I
+        end, binary_to_list(V));
 
 
 decode_value(byte,_Endian,N,Bin) ->
@@ -566,9 +566,9 @@ undo_differencing(Data,_,_,_) ->
 
 undo_differencing4(Data, Width) ->
     if binary(Data) ->
-	    undo_differencing4(0, Width, binary_to_list(Data),0,0,0,0, []);
+            undo_differencing4(0, Width, binary_to_list(Data),0,0,0,0, []);
        list(Data) ->
-	    undo_differencing4(0, Width, Data, 0,0,0,0, [])
+            undo_differencing4(0, Width, Data, 0,0,0,0, [])
     end.
 
 
@@ -576,27 +576,27 @@ undo_differencing4(W, W, Rest, _,_,_,_,Ack) ->
     undo_differencing4(0,W, Rest, 0,0,0,0,Ack);
 undo_differencing4(C, W, [R,G,B,A|Rest], AR,AG,AB,AA, Ack) ->
     %% io:format("undo ~p ~n", [[{R,G,B,A}, {AR,AG,AB,AA}]]),
-    RR = (R + AR) rem 256,    
-    RG = (G + AG) rem 256, 
+    RR = (R + AR) rem 256,
+    RG = (G + AG) rem 256,
     RB = (B + AB) rem 256,
     RA = (A + AA) rem 256,
-    undo_differencing4(C+1, W, Rest, RR,RG,RB,RA, [RA,RB,RG,RR|Ack]); 
+    undo_differencing4(C+1, W, Rest, RR,RG,RB,RA, [RA,RB,RG,RR|Ack]);
 undo_differencing4(_, _, [], _,_,_,_, Ack) ->
     list_to_binary(reverse(Ack)).
 
 
 undo_differencing3(Data, Width) ->
     if binary(Data) ->
-	    undo_differencing3(0, Width, binary_to_list(Data),0,0,0, []);
+            undo_differencing3(0, Width, binary_to_list(Data),0,0,0, []);
        list(Data) ->
-	    undo_differencing3(0, Width, Data, 0, 0, 0, [])
+            undo_differencing3(0, Width, Data, 0, 0, 0, [])
     end.
 
 undo_differencing3(W, W, Rest, _,_,_, Ack) ->
     undo_differencing3(0,W, Rest, 0,0,0, Ack);
 undo_differencing3(C, W, [R,G,B|Rest], AR,AG,AB, Ack) ->
-    RR = (R + AR) rem 256,    
-    RG = (G + AG) rem 256, 
+    RR = (R + AR) rem 256,
+    RG = (G + AG) rem 256,
     RB = (B + AB) rem 256,
     undo_differencing3(C+1, W, Rest, RR,RG,RB, [RB,RG,RR|Ack]);
 undo_differencing3(_, _, [], _,_,_, Ack) ->

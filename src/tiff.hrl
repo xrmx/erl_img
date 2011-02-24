@@ -15,27 +15,27 @@
 -define(DOUBLE,    12).
 
 -record(tiff_entry, {
-	  ifd,      %% ifd number I.J.K (reversed)
-	  tag,      %% tag name (atom) or number
-	  type,     %% value type
-	  endian,   %% little or big
-	  value,    %% value
-	  offs      %% offset to value start (strings,binaries...)
-	 }).
+          ifd,      %% ifd number I.J.K (reversed)
+          tag,      %% tag name (atom) or number
+          type,     %% value type
+          endian,   %% little or big
+          value,    %% value
+          offs      %% offset to value start (strings,binaries...)
+         }).
 
 %% TIFF tags
--define(NewSubfileType,254). %% long 
+-define(NewSubfileType,254). %% long
 -define(SubfileType, 255).  %% short
 -define(ImageWidth,  256).  %% short/long
 -define(ImageLength, 257).  %% short/long
 -define(BitsPerSample,258). %% short  N=SamplesPerPixel
--define(Compression, 259).  %% short  N=1 
+-define(Compression, 259).  %% short  N=1
                             %%  1     no-compression (packed)
                             %%  2     ccitt huffman run-length encofing
                             %%  3     Group 3 Fax
                             %%  4     Group 4 Fax
                             %%  5     LZW
-                            %%  6     JPEG 
+                            %%  6     JPEG
                             %%  32773 Packbits simple run-length
 -define(PhotoMetricInterpretation, 262).        %% short
 -define(Threshholding, 263).   %% short N=1
@@ -68,9 +68,9 @@
 -define(ResolutionUnit, 296). %% short
 -define(PageNumber, 297).     %% short N=2
 -define(TransferFunction,301). %% short
--define(Software, 305).       %% ASCII software used 
+-define(Software, 305).       %% ASCII software used
 -define(DateTime,  306).      %% ASCII YYYY:MM:DD:HH:MM:SS
--define(Artist, 315).         %% ASCII 
+-define(Artist, 315).         %% ASCII
 -define(HostComputer,316).    %% ASCII computer/os where image was created
 -define(Predictor, 317).      %% short
 -define(WhitePoint, 318).     %% rational
@@ -112,5 +112,3 @@
 -endif.
 
 -endif.
-
-
