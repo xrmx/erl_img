@@ -14,7 +14,6 @@ mime_type() -> "".
 
 extensions() -> [].
 
-    
 read_info(_Fd) ->
     {error, bad_magic}.
 
