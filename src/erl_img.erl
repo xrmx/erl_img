@@ -7,7 +7,7 @@
 
 -include_lib("kernel/include/file.hrl").
 
--include_lib("erl_img/include/erl_img.hrl").
+-include_lib("../include/erl_img.hrl").
 
 -export([magic_info/1]).
 -export([mime_type/1]).

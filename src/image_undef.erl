@@ -5,7 +5,7 @@
 
 -module(image_undef).
 
--include_lib("erl_img/include/erl_img.hrl").
+-include_lib("../include/erl_img.hrl").
 -include("api.hrl").
 
 magic(_) -> false.
