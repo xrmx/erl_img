@@ -451,3 +451,37 @@ valid_crc32(Binary, CRC32) ->
     zlib:close(Z),
     ?dbg("crc check: ~p == ~p\n", [CRC32, Value]),
     CRC32 == Value.
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+png_suite_files() ->
+    application:start(erl_img),
+    PrivDir = code:priv_dir(erl_img),
+    filelib:wildcard(PrivDir ++ "/pngsuite/*.png").
+
+-define(PNG_SUITE_TEST(TestFun),
+        [{filename:basename(FileName),
+          fun() ->
+                  TestFun(FileName)
+          end}
+         || FileName <- png_suite_files()]).
+
+
+png_suite_read_test_() ->
+    ?PNG_SUITE_TEST(
+      fun(FileName) ->
+              {ok, Fd} = file:open(FileName, [read, binary]),
+              {ok, Info} = image_png:read_info(Fd),
+              {ok, 0} = file:position(Fd, 0),
+              ?assertMatch({ok, _}, image_png:read(Fd, Info))
+      end).
+
+png_suite_magic_test_() ->
+    ?PNG_SUITE_TEST(
+      fun(FileName) ->
+              {ok, Bin} = file:read_file(FileName),
+              ?assertEqual(true, image_png:magic(Bin))
+      end).
+
+-endif.
