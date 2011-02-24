@@ -1,19 +1,12 @@
+#!/usr/bin/env escript
+%% -*- erlang -*-
+
 %%% File    : mktab.erl
 %%% Author  : Tony Rogvall <tony@bit.hemma.se>
 %%% Description : reverse bits table
 %%% Created :  2 Apr 2003 by Tony Rogvall <tony@bit.hemma.se>
 
--module(mktab).
-
--export([start/0]).
-
-%% convert a hex byte into two ascii letters
-hex8(X) ->
-    [nib((X bsr 4) band 16#f),nib(X band 16#f)].
-
-nib(N) when N =< 9 -> N+$0;
-nib(N) -> (N-10)+$A.
-
+%% Used to generate the table in lzw.erl
 bin(N) ->
     bin(N,8,[]).
 
@@ -31,7 +24,7 @@ revbits(_N,0,A) ->
 revbits(N,I,A) ->
     revbits(N bsr 1,I-1,(A bsl 1) bor (N band 1)).
 
-start() ->
+main([]) ->
     lists:foreach(fun(I) ->
                           io:format("   ~s -> ~s;\n",
                                     [bin(I), bin(revbits(I))])
