@@ -565,10 +565,10 @@ undo_differencing(Data,_,_,_) ->
     Data.
 
 undo_differencing4(Data, Width) ->
-    if binary(Data) ->
-            undo_differencing4(0, Width, binary_to_list(Data),0,0,0,0, []);
-       list(Data) ->
-            undo_differencing4(0, Width, Data, 0,0,0,0, [])
+    if is_binary(Data) ->
+	    undo_differencing4(0, Width, binary_to_list(Data),0,0,0,0, []);
+       is_list(Data) ->
+	    undo_differencing4(0, Width, Data, 0,0,0,0, [])
     end.
 
 
@@ -586,10 +586,10 @@ undo_differencing4(_, _, [], _,_,_,_, Ack) ->
 
 
 undo_differencing3(Data, Width) ->
-    if binary(Data) ->
-            undo_differencing3(0, Width, binary_to_list(Data),0,0,0, []);
-       list(Data) ->
-            undo_differencing3(0, Width, Data, 0, 0, 0, [])
+    if is_binary(Data) ->
+	    undo_differencing3(0, Width, binary_to_list(Data),0,0,0, []);
+       is_list(Data) ->
+	    undo_differencing3(0, Width, Data, 0, 0, 0, [])
     end.
 
 undo_differencing3(W, W, Rest, _,_,_, Ack) ->

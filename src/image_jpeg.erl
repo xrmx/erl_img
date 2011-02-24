@@ -120,7 +120,7 @@ process_sofn(<<Depth:8,Height:16,Width:16,_Components:8,_Bin/binary>>, IMG) ->
                   height = Height,
                   width  = Width }.
 
-collect_maker(_Fd, T, St) ->
+collect_maker(_Fd, _T, St) ->
     {ok, St}.
 
 collect_exif(Fd, T, St) ->
