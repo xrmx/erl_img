@@ -1,9 +1,12 @@
+REBAR=./rebar
 
-code: clean
-	erl -noshell -pa ebin -s make all -s erlang halt
+.PHONY: all clean test
 
-run:	code
-	werl -pa ebin &
-	
+all:
+	@$(REBAR) compile
+
 clean:
-	rm -fv ebin/*.beam erl_crash.dump
+	@$(REBAR) clean
+
+test:
+	@$(REBAR) eunit
