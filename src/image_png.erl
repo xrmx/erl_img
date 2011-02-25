@@ -236,13 +236,20 @@ read(Fd, IMG, RowFun, St0) ->
     end.
 
 create_pixmap(IMG, Bin, Palette, RowFun, St0) ->
+    Interlace = attribute(IMG, 'Interlace', 0),
     Pix0 = #erl_pixmap { width  = IMG#erl_image.width,
                          height = IMG#erl_image.height,
                          palette = Palette,
                          format  = IMG#erl_image.format },
     Bpp = bpp(IMG#erl_image.format),
-    BytesPerRow = bytes_per_row(IMG#erl_image.format,IMG#erl_image.width),
-    raw_data(Bin,Pix0,RowFun,St0,0,Bpp,BytesPerRow).
+    BytesPerRow = bytes_per_row(
+                    IMG#erl_image.format,IMG#erl_image.width),
+    case Interlace of
+        0 ->
+            raw_data(Bin,Pix0,RowFun,St0,0,Bpp,BytesPerRow);
+        1 ->
+            interlaced_data(Bin, Pix0, RowFun, St0, Bpp, BytesPerRow)
+    end.
 
 
 raw_data(Bin,Pix,RowFun,St0,Ri,Bpp,Width) ->
@@ -258,6 +265,169 @@ raw_data(Bin,Pix,RowFun,St0,Ri,Bpp,Width) ->
         _ ->
             {ok, Pix#erl_pixmap { pixels = St0 }}
     end.
+
+%%
+%% Implement Adam7 Interlacing.
+%%
+%% Adam7 is a 2 dimensional 7 pass interlacing scheme.  The
+%% PNG file consists of 7 "images" each image represents one pass.
+%% The below 8x8 grid explains how each pass should write pixels
+%% into the final image. on the first pass, the pixels from the
+%% first sub-image is written to our final image ever 8 colums and
+%%  every 8 rows starting at 0,0.  (The top left corner of the
+%% final image)
+%%
+%% On the second pass we write each pixel from the second sub-image
+%% Ever 8 columns and 8 rows, starting at 0,4.
+%%
+%% For passes 3-7 the x and y stepping gets smaller and smaller.
+%%
+%% 1 6 4 6 2 6 4 6
+%% 7 7 7 7 7 7 7 7
+%% 5 6 5 6 5 6 5 6
+%% 7 7 7 7 7 7 7 7
+%% 3 6 4 6 3 6 4 6
+%% 7 7 7 7 7 7 7 7
+%% 5 6 5 6 5 6 5 6
+%% 7 7 7 7 7 7 7 7
+%%
+%% The actual PNG data stream appears it be layed out as a series
+%% of smaller PNG data streams.  It consists of "rows" or scanlines
+%% of the form <<Filter:8 Row:BytesInRowForPass>>
+%%
+%% You seem to be able to treat these sub images as completely
+%% independent including filtering each Row as you read in the sub
+%% image. (including maintaing individual rows of the sub-image to
+%% give some filtering methods access to the prior row.)
+%%
+%% Once you have filtered a row of the sub image you should be
+%% able to take each pixel in that row and insert it into the final
+%% pixel matrix at the intervals defined by the adam7 grid.
+%%
+
+%% { xstart, ystart, xstep, ystep, blockheight, blockwidth }
+%% blockheight and blockwidth probably are only relevant to
+%% displaying the image when you would want to basically blow up
+%% each pixel from the subimage at a given pass to fill in a larger
+%% space of the final image.
+%%
+adam7(1) ->
+    {0,0,8,8,8,8};
+adam7(2) ->
+    {4,0,8,8,8,4};
+adam7(3) ->
+    {0,4,4,8,4,4};
+adam7(4) ->
+    {2,0,4,4,4,2};
+adam7(5) ->
+    {0,2,2,4,2,2};
+adam7(6) ->
+    {1,0,2,2,2,1};
+adam7(7) ->
+    {0,1,1,2,1,1}.
+
+%%
+%% This is a pretty terrible pixel array implementation.  We
+%% create a 2d array the size of our final image so we can
+%% write individual binary pixels to fill in the pixels for
+%% the final image after each row of the sub-images is read
+%%
+pixel_matrix(Height, Width, Bpp) ->
+    Default = list_to_binary([0 || _ <- lists:seq(1, Bpp)]),
+    array:fix(array:from_list([array:new(Width * Bpp,
+                                         [fixed, {default, Default}])
+                               || _ <- lists:seq(1, Height)])).
+
+pixel_matrix_to_list(Pm) ->
+    [array:to_list(Row) || Row <- array:to_list(Pm)].
+
+
+insert_pixel(Pm, X, Y, Value) ->
+    R0 = array:get(X, Pm),
+    R1 = array:set(Y, Value, R0),
+    array:set(X, R1, Pm).
+
+
+interlace_row(Pm,Pass,X,Xs,Y,Bpp,RowBin,RowSize,Height) ->
+    case RowBin of
+        <<Pixel:Bpp/binary, RowBin1/binary>> when X < RowSize ->
+            interlace_row(
+              insert_pixel(Pm, X, Y, Pixel),
+              Pass,
+              X + Xs, Xs, Y,
+              Bpp,RowBin1,RowSize,Height);
+        _ ->
+            Pm
+    end.
+
+interlaced_data(Bin0, Pix = #erl_pixmap{height = Height,
+                                        width = Width},
+                RowFun, St0, Bpp, BytesPerRow) ->
+    Pm0 = pixel_matrix(Height, Width, Bpp),
+    {Pm1, Bin1} = adam7_pass(Bin0, Pix, Pm0, RowFun, St0,
+                              1, Bpp, Height, BytesPerRow),
+    {Pm2, Bin2} = adam7_pass(Bin1, Pix, Pm1, RowFun, St0,
+                              2, Bpp, Height, BytesPerRow),
+    {Pm3, Bin3} = adam7_pass(Bin2, Pix, Pm2, RowFun, St0,
+                              3, Bpp, Height, BytesPerRow),
+    {Pm4, Bin4} = adam7_pass(Bin3, Pix, Pm3, RowFun, St0,
+                              4, Bpp, Height, BytesPerRow),
+    {Pm5, Bin5} = adam7_pass(Bin4, Pix, Pm4, RowFun, St0,
+                              5, Bpp, Height, BytesPerRow),
+    {Pm6, Bin6} = adam7_pass(Bin5, Pix, Pm5, RowFun, St0,
+                              6, Bpp, Height, BytesPerRow),
+    {Pm7, _Bin7} = adam7_pass(Bin6, Pix, Pm6, RowFun, St0,
+                               7, Bpp, Height, BytesPerRow),
+
+    {ok, Pix#erl_pixmap{
+           pixels=[{Ri, iolist_to_binary(
+                          array:to_list(array:get(Ri, Pm7)))}
+                   || Ri <- lists:seq(0, array:size(Pm7)-1)]}}.
+
+ceiling(X) ->
+    T = erlang:trunc(X),
+    case (X - T) of
+        Neg when Neg < 0 -> T;
+        Pos when Pos > 0 -> T + 1;
+        _ -> T
+    end.
+
+%
+%% This could all be factored better... The math here is
+%% cribbed from pypng.  We
+%%
+adam7_row_size(Pass, Width, Bpp) ->
+    {XStart, _YStart, XStep, _YStep, _BlockHeight, _BlockWidth} = adam7(Pass),
+    ceiling(((Width/Bpp) - XStart)/XStep).
+
+
+adam7_pass(Bin, Pix, Pm, RowFun, St0, Pass, Bpp, Height, Width) ->
+    {XStart, YStart, XStep, YStep,BlockHeight,BlockWidth} = adam7(Pass),
+    RowSize = adam7_row_size(Pass, Width, Bpp),
+    adam7_data(Bin, Pix, Pm, RowFun, St0, Pass,
+                XStart, XStep, YStart, YStep, BlockWidth,
+                Bpp, Height, RowSize).
+
+adam7_data(Bin,_Pix,Pm,_RowFun,St,Pass,_X,_Xs,Y,_Ys,
+           BlockWidth,_Bpp,Height,_Width) ->
+    {Pm, Bin};
+adam7_data(Bin,Pix,Pm,RowFun,St0,Pass,X,Xs,Y,Ys,
+           BlockWidth,Bpp,Height,Width) when Y < Height ->
+    case Bin of
+        <<Filter:8,Row:Width/binary,Bin1/binary>> ->
+            Prior = case St0 of
+                        [] -> <<>>;
+                        [{_,Row0}|_] -> Row0
+                    end,
+            Row1 = filter(Filter,Bpp,Row,Prior),
+            St1 = RowFun(Pix,Row1,Y,St0),
+            Pm1 = interlace_row(Pm, Pass, X, Xs, Y, Bpp, Row1,
+                                min(BlockWidth, Width), Height),
+            adam7_data(Bin1,Pix,Pm1,RowFun,St1, Pass,
+                        X,Xs,Y+Ys,Ys, BlockWidth,
+                        Bpp,Height,Width)
+    end.
+
 
 filter(0,_,Row,_Prior) -> Row;
 filter(1, Bpp, Row, Prior) -> filter_sub(Row,Prior,Bpp);
@@ -454,34 +624,119 @@ valid_crc32(Binary, CRC32) ->
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
-
+%%
+%% These tests use the pngsuite of test pngs from the libpng
+%% website to verify all sorts of things.  The intentionally corrupt
+%% pngs live in priv/pngsuite/corrupted because I didn't want
+%% to deal with them right now, see should probably write
+%% some more acceptance tests that ensures those fail for
+%% specific reasons.
+%%
 png_suite_files() ->
     application:start(erl_img),
     PrivDir = code:priv_dir(erl_img),
     filelib:wildcard(PrivDir ++ "/pngsuite/*.png").
+    %% filelib:wildcard("/Users/dreid/Untitled-*.png").
 
+%% Use a macro here so png_suite_*_test_ shows up in the eunit output.
 -define(PNG_SUITE_TEST(TestFun),
-        [{filename:basename(FileName),
+        [{filename:basename(FName),
           fun() ->
-                  TestFun(FileName)
+                  TestFun(FName)
           end}
-         || FileName <- png_suite_files()]).
+         || FName <- png_suite_files()]).
 
 
 png_suite_read_test_() ->
     ?PNG_SUITE_TEST(
       fun(FileName) ->
               {ok, Fd} = file:open(FileName, [read, binary]),
-              {ok, Info} = image_png:read_info(Fd),
+              {ok, Info} = read_info(Fd),
               {ok, 0} = file:position(Fd, 0),
-              ?assertMatch({ok, _}, image_png:read(Fd, Info))
+              ?assertMatch({ok, _}, read(Fd, Info))
       end).
 
 png_suite_magic_test_() ->
     ?PNG_SUITE_TEST(
       fun(FileName) ->
               {ok, Bin} = file:read_file(FileName),
-              ?assertEqual(true, image_png:magic(Bin))
+              ?assertEqual(true, magic(Bin))
       end).
+
+non_png_magic_test() ->
+    ?assertEqual(false, magic(<<"notapng">>)).
+
+mime_type_test() ->
+    ?assertEqual("image/png", mime_type()).
+
+extensions_test() ->
+    ?assertEqual([".png"], extensions()).
+
+%% This is the datastream of an 8x8 interlaced PNG with 1 byte per pixel.
+%%
+%% It was created by filling in each pixel in the grid adam7 grid
+%% using a different shade for each pass.  Starting with white for
+%% pass 1 and ending with black for pass 7.  It was made by hand
+%% in photoshop so the pixel values aren't particularly regular.
+%%
+adam7_block() ->
+    <<0,255,0,212,1,175,0,1,143,0,2,0,0,1,102,0,0,0,2,0,0,0,0,1,50,0,0,0,2,0,
+      0,0,0,2,0,0,0,0,2,0,0,0,0,1,23,0,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,2,0,0,0,
+      0,0,0,0,0,2,0,0,0,0,0,0,0,0>>.
+
+
+%% This test fails despite many of the basic interlaced PNG images
+%% from the acceptance tests not causing things to crash.
+%% so clearly those are images are not being rendered properly.
+adam7_pass_test() ->
+    Pm = pixel_matrix(8, 8, 1),
+    {Pm1, Bin1} = adam7_pass(adam7_block(), #erl_pixmap{},
+                             Pm,
+                             fun(_, Row, Ri, St) ->
+                                     ?dbg("png: load row ~p\n", [Ri]),
+                                     [{Ri,Row}|St]
+                             end,
+                             [],
+                             1,
+                             1,
+                             8,
+                             8),
+    ?assertEqual(
+       [[<<255>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>],
+        [<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>],
+        [<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>],
+        [<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>],
+        [<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>],
+        [<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>],
+        [<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>],
+        [<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>,<<0>>]
+       ],
+       pixel_matrix_to_list(Pm1)).
+
+
+pixel_matrix_test() ->
+    A = pixel_matrix(8, 8, 3),
+    ?assertEqual(8, array:size(A)),
+    ?assertEqual(24, array:size(array:get(0, A))),
+    ?assertMatch([<<0,0,0>> | _], array:to_list(array:get(0, A))).
+
+insert_pixel_test() ->
+    A = pixel_matrix(8, 8, 3),
+    A1 = insert_pixel(A, 0, 0, <<1,1,1>>),
+    ?assertEqual(<<1,1,1>>, array:get(0, array:get(0, A1))).
+
+adam7_row_size_test_() ->
+    %% [{Pass, Width (in pixels), BytesPerPixel, ExpectedSize}]
+    TestData = [{1,8,1,1},
+                {2,8,1,1},
+                {3,8,1,2},
+                {4,8,1,2},
+                {5,8,1,4},
+                {6,8,1,4},
+                {7,8,1,8}],
+
+    [{lists:flatten(io_lib:format("adam7_row_size(~p,~p,~p) == ~p",
+                                  [P, W, B, E])),
+      ?_assertEqual(E, adam7_row_size(P, W, B))} || {P,W,B,E} <- TestData].
 
 -endif.
