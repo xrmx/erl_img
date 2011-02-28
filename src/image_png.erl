@@ -270,7 +270,7 @@ interlaced_data(Bin, Pix0=#erl_pixmap{width=Width, height=Height},
                 RowFun, St0, Bpp) ->
     [P1, P2, P3, P4, P5, P6, P7] = interlaced_pass(Bin, Width, Height, Bpp, 1),
     Passes = {P1, P2, P3, P4, P5, P6, P7},
-    Cols = lists:seq(0, Width),
+    Cols = lists:seq(0, Width - 1),
     merge_adam7(Passes, Pix0, RowFun, St0, 0, Bpp, Cols, Height).
 
 merge_adam7(_P, Pix, _RowFun, St0, Height, _Bpp, _Cols, Height) ->
@@ -299,7 +299,7 @@ adam7_pixel(P, Ri, Bpp, Col) when Ri band 1 =:= 1 ->
 adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 0 andalso Col band 7 =:= 0 ->
     %% [1] 6 4 6 2 6 4 6
     binary_part(array:get(Ri, element(1, P)), (Col div 8) * Bpp, Bpp);
-adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 0 andalso Col band 7 =:= 1 ->
+adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 0 andalso Col band 1 =:= 1 ->
     %% 1 [6] 4 [6] 2 [6] 4 [6]
     binary_part(array:get(Ri, element(6, P)), (Col div 2) * Bpp, Bpp);
 adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 0 andalso
@@ -323,7 +323,7 @@ adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 4 andalso Col band 1 =:= 1 ->
 adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 4 andalso
                                   (Col band 7 =:= 2 orelse Col band 7 =:= 6) ->
     %% 3 6 [4] 6 3 6 [4] 6
-    binary_part(array:get(Ri, element(6, P)), (Col div 2) * Bpp, Bpp).
+    binary_part(array:get(Ri, element(4, P)), (Col div 4) * Bpp, Bpp).
 
 
 
@@ -600,6 +600,47 @@ png_suite_basic_interlace_test() ->
        Pm(F0),
        Pm(F1)),
     ok.
+
+merge_adam7_row_test_() ->
+    %% 1 6 4 6 2 6 4 6
+    %% 7 7 7 7 7 7 7 7
+    %% 5 6 5 6 5 6 5 6
+    %% 7 7 7 7 7 7 7 7
+    %% 3 6 4 6 3 6 4 6
+    %% 7 7 7 7 7 7 7 7
+    %% 5 6 5 6 5 6 5 6
+    %% 7 7 7 7 7 7 7 7
+    P = {array:from_orddict([{0, <<1>>}]),
+         array:from_orddict([{0, <<2>>}]),
+         array:from_orddict([{4, <<3, 3>>}]),
+         array:from_orddict([{0, <<4, 4>>},
+                             {4, <<4, 4>>}]),
+         array:from_orddict([{2, <<5, 5, 5, 5>>},
+                             {6, <<5, 5, 5, 5>>}]),
+         array:from_orddict([{0, <<6, 6, 6, 6>>},
+                             {2, <<6, 6, 6, 6>>},
+                             {4, <<6, 6, 6, 6>>},
+                             {6, <<6, 6, 6, 6>>}]),
+         array:from_orddict([{1, <<7, 7, 7, 7, 7, 7, 7, 7>>},
+                             {3, <<7, 7, 7, 7, 7, 7, 7, 7>>},
+                             {5, <<7, 7, 7, 7, 7, 7, 7, 7>>},
+                             {7, <<7, 7, 7, 7, 7, 7, 7, 7>>}])},
+    ExpectList = [{0, <<1, 6, 4, 6, 2, 6, 4, 6>>},
+                  {1, <<7, 7, 7, 7, 7, 7, 7, 7>>},
+                  {2, <<5, 6, 5, 6, 5, 6, 5, 6>>},
+                  {3, <<7, 7, 7, 7, 7, 7, 7, 7>>},
+                  {4, <<3, 6, 4, 6, 3, 6, 4, 6>>},
+                  {5, <<7, 7, 7, 7, 7, 7, 7, 7>>},
+                  {6, <<5, 6, 5, 6, 5, 6, 5, 6>>},
+                  {7, <<7, 7, 7, 7, 7, 7, 7, 7>>}],
+    [(fun ({N, Expect}) ->
+             fun () ->
+                     ?assertEqual(
+                        Expect,
+                        merge_adam7_row(P, N, 1, lists:seq(0, 7)))
+             end
+     end)(X) || X <- ExpectList].
+
 
 png_suite_read_test_() ->
     ?PNG_SUITE_TEST(
