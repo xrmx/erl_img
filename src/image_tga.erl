@@ -78,7 +78,8 @@ read_info(Fd) ->
             {error, bad_magic}
     end.
 
-write_info(Fd, #erl_image{width=Width, height=Height, bytes_pp=BPP}) ->
+write_info(Fd, #erl_image{width=Width, height=Height,
+                          bytes_pp=BPP, format=Format}) ->
     file:write(Fd,
                <<0, 0:7, 0:1,
                  2,
@@ -89,7 +90,7 @@ write_info(Fd, #erl_image{width=Width, height=Height, bytes_pp=BPP}) ->
                  0:16/little-signed-integer,
                  Width:16/little-signed-integer,
                  Height:16/little-signed-integer,
-                 (BPP * 8),
+                 (bpp(BPP, Format) * 8),
                  0:1, 0:1, 1:1, 0:1, 0:4>>).
 
 read(Fd,IMG,RowFun,St0) ->
@@ -134,6 +135,13 @@ bgr_to_rgb(Row) ->
 bgra_to_rgba(Row) ->
     << <<R, G, B, A>> || <<B, G, R, A>> <= Row >>.
 
+bpp(_Bpp, r8g8b8a8) ->
+    4;
+bpp(_Bpp, r8g8b8) ->
+    3;
+bpp(Bpp, _Format) ->
+    Bpp.
+
 read(Fd, IMG=#erl_image{bytes_pp=BPP}) ->
     read(Fd, IMG,
          case BPP of
@@ -151,9 +159,9 @@ read(Fd, IMG=#erl_image{bytes_pp=BPP}) ->
          []).
 
 
-write(Fd, IMG=#erl_image{pixmaps=[PM], bytes_pp=BPP}) ->
+write(Fd, IMG=#erl_image{pixmaps=[PM], bytes_pp=BPP, format=Format}) ->
     write_info(Fd, IMG),
-    RowFun = case BPP of
+    RowFun = case bpp(BPP, Format) of
                  3 -> fun rgb_to_bgr/1;
                  4 -> fun rgba_to_bgra/1
              end,
