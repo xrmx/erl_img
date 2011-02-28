@@ -51,7 +51,7 @@ read_magic(<<0,
                           32 -> r8g8b8a8
                       end,
                order=left_to_right,
-               depth=Depth,
+               depth=8,
                alignment=case VFlip of
                              0 -> 4;
                              1 -> 1
@@ -78,7 +78,7 @@ read_info(Fd) ->
             {error, bad_magic}
     end.
 
-write_info(Fd, #erl_image{width=Width, height=Height, depth=Depth}) ->
+write_info(Fd, #erl_image{width=Width, height=Height, bytes_pp=BPP}) ->
     file:write(Fd,
                <<0, 0:7, 0:1,
                  2,
@@ -89,7 +89,7 @@ write_info(Fd, #erl_image{width=Width, height=Height, depth=Depth}) ->
                  0:16/little-signed-integer,
                  Width:16/little-signed-integer,
                  Height:16/little-signed-integer,
-                 Depth,
+                 (BPP * 8),
                  0:1, 0:1, 1:1, 0:1, 0:4>>).
 
 read(Fd,IMG,RowFun,St0) ->
@@ -134,15 +134,15 @@ bgr_to_rgb(Row) ->
 bgra_to_rgba(Row) ->
     << <<R, G, B, A>> || <<B, G, R, A>> <= Row >>.
 
-read(Fd, IMG=#erl_image{depth=Depth}) ->
+read(Fd, IMG=#erl_image{bytes_pp=BPP}) ->
     read(Fd, IMG,
-         case Depth of
-             24 ->
+         case BPP of
+             3 ->
                  fun(_, Row, Ri, St) ->
                          ?dbg("tga: load bgr row ~p\n", [Ri]),
                          [{Ri,bgr_to_rgb(Row)}|St]
                  end;
-             32 ->
+             4 ->
                  fun(_, Row, Ri, St) ->
                          ?dbg("tga: load bgra row ~p\n", [Ri]),
                          [{Ri,bgra_to_rgba(Row)}|St]
@@ -151,11 +151,11 @@ read(Fd, IMG=#erl_image{depth=Depth}) ->
          []).
 
 
-write(Fd, IMG=#erl_image{pixmaps=[PM], depth=Depth}) ->
+write(Fd, IMG=#erl_image{pixmaps=[PM], bytes_pp=BPP}) ->
     write_info(Fd, IMG),
-    RowFun = case Depth of
-                 24 -> fun rgb_to_bgr/1;
-                 32 -> fun rgba_to_bgra/1
+    RowFun = case BPP of
+                 3 -> fun rgb_to_bgr/1;
+                 4 -> fun rgba_to_bgra/1
              end,
     write_rows(Fd, RowFun, lists:sort(PM#erl_pixmap.pixels)).
 
