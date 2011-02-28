@@ -1,4 +1,5 @@
 /.eunit
 /ebin
-TEST-*.xml
 /doc
+TEST-*.xml
+.DS_Store
