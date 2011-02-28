@@ -98,7 +98,7 @@ read(Fd,IMG,RowFun,St0) ->
               AspectRatio:8>>} ->
             Palette = read_palette(Fd, Map, Pix+1),
             ?dbg("sizeof(palette)=~p Map=~w, Cr=~w, Sort=~w, Pix=~w\n",
-                 [length(Palette),Map,Cr,Sort,Pix]),
+                 [length(Palette),Map,_Cr,Sort,Pix]),
             ?dbg("Background=~w, AspectRatio=~w\n",
                  [Background, AspectRatio]),
             As = [{'Background',Background},
