@@ -591,8 +591,8 @@ png_suite_basic_interlace_test() ->
                  filelib:wildcard(PrivDir ++ "/pngsuite/bas[in]2c08.png")),
     Pm = fun (F) ->
                  {ok, Img=#erl_image{pixmaps=[PM]}} = erl_img:load(F),
-                 erl_img:save("/tmp/" ++ filename:basename(F) ++ ".tga",
-                              Img#erl_image{type=image_tga}),
+                 %% erl_img:save("/tmp/" ++ filename:basename(F) ++ ".tga",
+                 %%              Img#erl_image{type=image_tga}),
                  #erl_pixmap{pixels=Rows} = PM,
                  lists:sort(Rows)
          end,
