@@ -634,12 +634,13 @@ merge_adam7_row_test_() ->
                   {6, <<5, 6, 5, 6, 5, 6, 5, 6>>},
                   {7, <<7, 7, 7, 7, 7, 7, 7, 7>>}],
     [(fun ({N, Expect}) ->
-             fun () ->
-                     ?assertEqual(
-                        Expect,
-                        merge_adam7_row(P, N, 1, lists:seq(0, 7)))
-             end
-     end)(X) || X <- ExpectList].
+              {"row_" ++ integer_to_list(N),
+               fun () ->
+                       ?assertEqual(
+                          Expect,
+                          merge_adam7_row(P, N, 1, lists:seq(0, 7)))
+               end}
+      end)(X) || X <- ExpectList].
 
 
 png_suite_read_test_() ->
