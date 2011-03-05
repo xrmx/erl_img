@@ -572,9 +572,11 @@ valid_crc32(Binary, CRC32) ->
 png_suite_files() ->
     application:start(erl_img),
     PrivDir = code:priv_dir(erl_img),
-    filelib:wildcard(PrivDir ++ "/pngsuite/_skip_*.png").
-    %% filelib:wildcard(PrivDir ++ "/pngsuite/*.png").
-    %% filelib:wildcard("/Users/dreid/Untitled-*.png").
+    %% Skip tests for unsupported 1-bit, 2-bit, 4-bit color
+    {ok, SkipRegex} = re:compile("0[124]\\.png"),
+    lists:filter(
+      fun (Fn) -> nomatch =:= re:run(Fn, SkipRegex) end,
+      filelib:wildcard(PrivDir ++ "/pngsuite/*.png")).
 
 %% Use a macro here so png_suite_*_test_ shows up in the eunit output.
 -define(PNG_SUITE_TEST(TestFun),
