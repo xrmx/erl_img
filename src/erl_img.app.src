@@ -1,6 +1,6 @@
 {application, erl_img,
  [{description, "erl_img"},
-  {vsn, "1.1.0"},
+  {vsn, "1.7.0"},
   {modules, []},
   {registered, []},
   {applications, [kernel, stdlib, crypto]}]}.
