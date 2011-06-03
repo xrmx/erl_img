@@ -83,9 +83,11 @@ scan_info(Fd, IMG, false, ?tEXt, Length) ->
     end;
 scan_info(Fd, IMG, false, ?zTXt, Length) ->
     case read_chunk_crc(Fd, Length) of
-        {ok, CBin} ->
-            Bin = zlib:uncompress(CBin),
-            scan_info(Fd, update_txt(IMG, Bin), false);
+        {ok, Bin} ->
+            [Key, CompressedValue] = binary:split(Bin, <<0, 0>>),
+            Value = zlib:uncompress(CompressedValue),
+            scan_info(Fd, IMG#erl_image { attributes = 
+                    [{list_to_atom(binary_to_list(Key)), binary_to_list(Value)}|IMG#erl_image.attributes] }, false);
         Error -> Error
     end;
 scan_info(Fd, IMG, false, ?bKGD, Length) ->

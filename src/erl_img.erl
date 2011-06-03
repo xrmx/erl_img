@@ -17,6 +17,7 @@
 -export([load/1, save/1, save/2, to_binary/1]).
 -export([attribute/2, attribute/3, set_attribute/3]).
 -export([extensions/1]).
+-export([read_info/2]).
 -export([write_info/3]).
 -export([hex32/1, hex16/1, hex8/1]).
 
