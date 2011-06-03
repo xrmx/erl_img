@@ -86,8 +86,7 @@ scan_info(Fd, IMG, false, ?zTXt, Length) ->
         {ok, Bin} ->
             [Key, CompressedValue] = binary:split(Bin, <<0, 0>>),
             Value = zlib:uncompress(CompressedValue),
-            scan_info(Fd, IMG#erl_image { attributes = 
-                    [{list_to_atom(binary_to_list(Key)), binary_to_list(Value)}|IMG#erl_image.attributes] }, false);
+            scan_info(Fd, set_attribute(IMG, list_to_atom(binary_to_list(Key)), binary_to_list(Value)), false);
         Error -> Error
     end;
 scan_info(Fd, IMG, false, ?bKGD, Length) ->
@@ -297,35 +296,35 @@ merge_adam7_row(P, Ri, Bpp, Cols) ->
 
 adam7_pixel(P, Ri, Bpp, Col) when Ri band 1 =:= 1 ->
     %% [7 7 7 7 7 7 7 7]
-    binary_part(array:get(Ri, element(7, P)), Col * Bpp, Bpp);
+    binary:part(array:get(Ri, element(7, P)), Col * Bpp, Bpp);
 adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 0 andalso Col band 7 =:= 0 ->
     %% [1] 6 4 6 2 6 4 6
-    binary_part(array:get(Ri, element(1, P)), (Col div 8) * Bpp, Bpp);
+    binary:part(array:get(Ri, element(1, P)), (Col div 8) * Bpp, Bpp);
 adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 0 andalso Col band 1 =:= 1 ->
     %% 1 [6] 4 [6] 2 [6] 4 [6]
-    binary_part(array:get(Ri, element(6, P)), (Col div 2) * Bpp, Bpp);
+    binary:part(array:get(Ri, element(6, P)), (Col div 2) * Bpp, Bpp);
 adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 0 andalso
                                   (Col band 7 =:= 2 orelse Col band 7 =:= 6) ->
     %% 1 6 [4] 6 2 6 [4] 6
-    binary_part(array:get(Ri, element(4, P)), (Col div 4) * Bpp, Bpp);
+    binary:part(array:get(Ri, element(4, P)), (Col div 4) * Bpp, Bpp);
 adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 0 andalso
                                   (Col band 7 =:= 2 orelse Col band 7 =:= 4) ->
     %% 1 6 4 6 [2] 6 4 6
-    binary_part(array:get(Ri, element(2, P)), (Col div 8) * Bpp, Bpp);
+    binary:part(array:get(Ri, element(2, P)), (Col div 8) * Bpp, Bpp);
 adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 2 orelse Ri band 7 =:= 6 ->
     %% [5 6 5 6 5 6 5 6]
-    binary_part(array:get(Ri, element(5 + (Col band 1), P)),
+    binary:part(array:get(Ri, element(5 + (Col band 1), P)),
                 (Col div 2) * Bpp, Bpp);
 adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 4 andalso Col band 3 =:= 0 ->
     %% [3] 6 4 6 [3] 6 4 6
-    binary_part(array:get(Ri, element(3, P)), (Col div 4) * Bpp, Bpp);
+    binary:part(array:get(Ri, element(3, P)), (Col div 4) * Bpp, Bpp);
 adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 4 andalso Col band 1 =:= 1 ->
     %% 3 [6] 4 [6] 3 [6] 4 [6]
-    binary_part(array:get(Ri, element(6, P)), (Col div 2) * Bpp, Bpp);
+    binary:part(array:get(Ri, element(6, P)), (Col div 2) * Bpp, Bpp);
 adam7_pixel(P, Ri, Bpp, Col) when Ri band 7 =:= 4 andalso
                                   (Col band 7 =:= 2 orelse Col band 7 =:= 6) ->
     %% 3 6 [4] 6 3 6 [4] 6
-    binary_part(array:get(Ri, element(4, P)), (Col div 4) * Bpp, Bpp).
+    binary:part(array:get(Ri, element(4, P)), (Col div 4) * Bpp, Bpp).
 
 
 
