@@ -61,11 +61,13 @@ scan_info(Fd, IMG, true, ?IHDR, Length) ->
         {ok,  <<Width:32, Height:32, BitDepth:8,
                ColorType:8, CompressionMethod:8,
                FilterMethod:8, InterlaceMethod:8, _/binary >>} ->
+               Format = format(ColorType,BitDepth),
             scan_info(Fd, IMG#erl_image {
                             width = Width,
                             height = Height,
                             depth = BitDepth,
-                            format = format(ColorType,BitDepth),
+                            format = Format,
+                            bytes_pp = bpp(Format),
                             order  = left_to_right,
                             attributes =
                             [ {'ColorType', ColorType},
@@ -316,7 +318,6 @@ write(Fd, IMG) ->
                     RowNum1 < RowNum2
             end, PixMap#erl_pixmap.pixels)),
     CompressedData = zlib:deflate(Z, FilteredData, finish),
-    io:format("Compressed data: ~p~n", [CompressedData]),
     write_chunk_crc(Fd, ?IDAT, CompressedData),
     zlib:deflateEnd(Z),
     zlib:close(Z),
