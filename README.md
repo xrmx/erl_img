@@ -1,10 +1,10 @@
 erl_img: Erlang image processing library
 ========================================
 
-erl_img is a library for reading and writing image files. The goal is to
-provide the Erlang community with functionality similar to ImageMagick. erl_img
-was originally excavated from the Jungerl repository, but a number of
-modifications have since been made.
+erl_img is a library for reading, writing, scaling, and cropping image files.
+The goal is to provide the Erlang community with functionality similar to
+ImageMagick. erl_img was originally excavated from the Jungerl repository, but
+a number of modifications have since been made.
 
 API
 ---
@@ -18,8 +18,8 @@ the appropriate record definitions. The erl_img API is:
     % Get the MIME type
     erl_img:mime_type(IMG) -> "image/something"
 
-    % Resize
-    IMG1 = erl_image:resize(IMG, 0.5) % scale factor
+    % Scale
+    IMG1 = erl_image:scale(IMG, 0.5) % scale factor
 
     % Crop
     IMG2 = erl_image:crop(IMG1, 
