@@ -18,11 +18,21 @@ the appropriate record definitions. The erl_img API is:
     % Get the MIME type
     erl_img:mime_type(IMG) -> "image/something"
 
+    % Resize
+    IMG1 = erl_image:resize(IMG, 0.5) % scale factor
+
+    % Crop
+    IMG2 = erl_image:crop(IMG1, 
+            IMG1#erl_image.width / 2,  % new width
+            IMG1#erl_image.height / 2, % new height
+            IMG1#erl_image.width / 4,  % x offset
+            IMG1#erl_image.height / 4) % y offset
+
     % convert to PNG
-    IMG1 = IMG#erl_image{ type = image_png, filename = "/path/to/image.png" }
+    IMG3 = IMG2#erl_image{ type = image_png, filename = "/path/to/image.png" }
 
     % Write
-    erl_img:save(IMG1) -> ok
+    erl_img:save(IMG3) -> ok
 
 
 Formats
