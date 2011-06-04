@@ -38,7 +38,7 @@ table summarizes file format support present in erl_img:
     JPEG        Metadata only
     PNG         Read/Write/Metadata
     TGA         Read/Write
-    TIFF        Read/Write/Metadata
+    TIFF        Read/Metadata
 
 Even if your desired format can be written, note that you may have to perform
 addtional processing to convert one format to another. Pixel information is
