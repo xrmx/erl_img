@@ -20,6 +20,7 @@
 -export([read_info/2]).
 -export([write_info/3]).
 -export([hex32/1, hex16/1, hex8/1]).
+-export([crop/5]).
 
 hex32(X) ->
     hex8(X bsr 24) ++ hex8(X bsr 16) ++ hex8(X bsr 8) ++ hex8(X).
@@ -213,3 +214,73 @@ dir_list([File|Fs], Dir) ->
     end;
 dir_list([], _Dir) ->
     [].
+
+
+crop(#erl_image{ width = Width, height = Height } = IMG, Width, Height, 0, 0) ->
+    IMG;
+crop(IMG, Width, Height, XOffset, YOffset) when YOffset > 0 ->
+    IMG1 = IMG#erl_image{ 
+        pixmaps = lists:foldr(fun
+                (PixMap, Acc) when PixMap#erl_pixmap.top + PixMap#erl_pixmap.height < YOffset ->
+                    Acc;
+                (PixMap, Acc) when PixMap#erl_pixmap.top >= YOffset ->
+                    [PixMap#erl_pixmap{ top = PixMap#erl_pixmap.top - YOffset }|Acc];
+                (PixMap, Acc) ->
+                    [PixMap#erl_pixmap{ 
+                            pixels = lists:map(fun({RowNum, Data}) ->
+                                        {RowNum - YOffset, Data}
+                                end, lists:nthtail(YOffset - PixMap#erl_pixmap.top, PixMap#erl_pixmap.pixels)),
+                            height = PixMap#erl_pixmap.height - (YOffset - PixMap#erl_pixmap.top),
+                            top = 0} | Acc]
+            end, [], IMG#erl_image.pixmaps),
+        height = IMG#erl_image.height - YOffset},
+    crop(IMG1, Width, Height, XOffset, 0);
+crop(IMG, Width, Height, XOffset, YOffset) when Height < IMG#erl_image.height ->
+    IMG1 = IMG#erl_image{ 
+        pixmaps = lists:foldr(fun
+                (PixMap, Acc) when PixMap#erl_pixmap.top > Height ->
+                    Acc;
+                (PixMap, Acc) when PixMap#erl_pixmap.top + PixMap#erl_pixmap.height =< Height ->
+                    [PixMap|Acc];
+                (PixMap, Acc) ->
+                    [PixMap#erl_pixmap{ 
+                            pixels = lists:sublist(PixMap#erl_pixmap.pixels, 0, Height - PixMap#erl_pixmap.top),
+                            height = Height - PixMap#erl_pixmap.top } | Acc]
+            end, [], IMG#erl_image.pixmaps),
+        height = Height},
+    crop(IMG1, Width, Height, XOffset, YOffset);
+crop(IMG, Width, Height, XOffset, YOffset) when XOffset > 0 ->
+    IMG1 = IMG#erl_image{
+        pixmaps = lists:foldr(fun
+                (PixMap, Acc) when PixMap#erl_pixmap.left + PixMap#erl_pixmap.width < XOffset ->
+                    Acc;
+                (PixMap, Acc) when PixMap#erl_pixmap.left >= XOffset ->
+                    [PixMap#erl_pixmap{ left = PixMap#erl_pixmap.left - XOffset }|Acc];
+                (PixMap, Acc) ->
+                    [PixMap#erl_pixmap{
+                            pixels = lists:map(fun({RowNum, Data}) ->
+                                        {RowNum, binary:part(Data, 
+                                                IMG#erl_image.bytes_pp * XOffset, 
+                                                byte_size(Data) - IMG#erl_image.bytes_pp * XOffset)}
+                                end, PixMap#erl_pixmap.pixels),
+                            width = PixMap#erl_pixmap.width - (XOffset - PixMap#erl_pixmap.left),
+                            left = 0 } | Acc]
+            end, [], IMG#erl_image.pixmaps),
+        width = IMG#erl_image.width - XOffset},
+    crop(IMG1, Width, Height, 0, YOffset);
+crop(IMG, Width, Height, XOffset, YOffset) when Width < IMG#erl_image.width ->
+    IMG1 = IMG#erl_image{
+        pixmaps = lists:foldr(fun
+                (PixMap, Acc) when PixMap#erl_pixmap.left > Width ->
+                    Acc;
+                (PixMap, Acc) when PixMap#erl_pixmap.left + PixMap#erl_pixmap.width =< Width ->
+                    [PixMap|Acc];
+                (PixMap, Acc) ->
+                    [PixMap#erl_pixmap{
+                            pixels = lists:map(fun({_RowNum, Data}) ->
+                                        binary:part(Data, 0, (Width - PixMap#erl_pixmap.left) * IMG#erl_image.bytes_pp)
+                                end, PixMap#erl_pixmap.pixels),
+                            width = Width - PixMap#erl_pixmap.left } | Acc]
+            end, [], IMG#erl_image.pixmaps),
+        width = Width},
+    crop(IMG1, Width, Height, XOffset, YOffset).

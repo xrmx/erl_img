@@ -125,11 +125,11 @@ scan_info(Fd, IMG, false, ?tRNS, Length) ->
     CT = attribute(IMG, 'ColorType', undefined),
     case read_chunk_crc(Fd, Length) of
         {ok, <<Gray:16>>} when CT == 0 ->
-            scan_info(Fd, set_attribute(IMG, 'Transparent' Gray), false);
+            scan_info(Fd, set_attribute(IMG, 'Transparent', Gray), false);
         {ok, <<R:16, B:16, G:16>>} when CT == 2 ->
             scan_info(Fd, set_attribute(IMG, 'Transparent', {R,G,B}), false);
         {ok, Binary} when CT == 3 ->
-            scan_info(Fd, IM#erl_image { alpha_table = binary_to_list(Binary) }, false);
+            scan_info(Fd, IMG#erl_image { alpha_table = binary_to_list(Binary) }, false);
         Error -> Error
     end;
 scan_info(_Fd, IMG, false, ?IEND, 0) ->
@@ -288,12 +288,12 @@ write(Fd, IMG) ->
     end,
     case attribute(IMG, 'Transparent', undefined) of
         undefined -> ok;
-        Val ->
+        TrVal ->
             TransparentChunk = case ColorType of
-                0 -> <<Val:16>>;
-                2 -> {R, G, B} = Val, <<R:16, G:16, B:16>>
+                0 -> <<TrVal:16>>;
+                2 -> {R0, G0, B0} = TrVal, <<R0:16, G0:16, B0:16>>
             end,
-            write_chunk_crc(F, ?tRNS, TransparentChunk)
+            write_chunk_crc(Fd, ?tRNS, TransparentChunk)
     end,
     case IMG#erl_image.alpha_table of
         undefined -> ok;
