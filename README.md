@@ -45,7 +45,7 @@ table summarizes file format support present in erl_img:
     
     BMP         Read only
     GIF         Read only
-    JPEG        Metadata only
+    JPEG        Read only
     PNG         Read/Write/Metadata
     TGA         Read/Write
     TIFF        Read/Metadata
@@ -61,12 +61,12 @@ pixel-by-pixel channel reversal.
 The following table summarizes the pixel formats that can be read and written
 by each file type.
 
-                  BMP  GIF  PNG  TGA  TIFF XPM
+                  BMP  GIF  JPEG  PNG  TGA  TIFF XPM
 
     b8g8r8        R
-    gray*                   RW        R
-    r8g8b8                  RW   RW   R
-    r8g8b8a8                RW   RW   R
-    r16g16b16               RW
-    r16g16b16a16            RW
-    palette*           R    RW        R    R
+    gray*                         RW        R
+    r8g8b8                  R     RW   RW   R
+    r8g8b8a8                      RW   RW   R
+    r16g16b16                     RW
+    r16g16b16a16                  RW
+    palette*           R          RW        R    R
