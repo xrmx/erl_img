@@ -357,7 +357,6 @@ resample_pixels(IMG, NewWidth, NewHeight) ->
                 RowPixels = lists:map(fun(ColNum) ->
                             XPos = (ColNum + 0.5) / NewWidth,
                             {Ax, Bx, Cx, Dx} = nearest_grid_points(XPos, IMG#erl_image.width),
-                            io:format("Sampling grid: (~.4f, ~.4f) ~p ~p~n", [XPos, YPos, {Ay, By, Cy, Dy}, {Ax, Bx, Cx, Dx}]),
                             Pos = {XPos * IMG#erl_image.width - Bx - 0.5, YPos * IMG#erl_image.height - By - 0.5},
 
                             Paa = get_pixel_bytes(IMG, Ax, Ay),

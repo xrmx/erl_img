@@ -51,13 +51,15 @@ read_info(Fd) ->
 scan_info(Fd, IMG, First) ->
     case read_chunk_hdr(Fd) of
         {ok, Length, Type} ->
-            scan_info(Fd, IMG, First, Type, Length);
+            Z = zlib:open(),
+            scan_info(Fd, IMG, First, Type, Length, Z),
+            zlib:close(Z);
         Error ->
             Error
     end.
 
-scan_info(Fd, IMG, true, ?IHDR, Length) ->
-    case read_chunk_crc(Fd,Length) of
+scan_info(Fd, IMG, true, ?IHDR, Length, Z) ->
+    case read_chunk_crc(Fd, Length, Z) of
         {ok,  <<Width:32, Height:32, BitDepth:8,
                ColorType:8, CompressionMethod:8,
                FilterMethod:8, InterlaceMethod:8, _/binary >>} ->
@@ -76,23 +78,23 @@ scan_info(Fd, IMG, true, ?IHDR, Length) ->
                               {'Interlace', InterlaceMethod }]}, false);
         Error -> Error
     end;
-scan_info(Fd, IMG, false, ?tEXt, Length) ->
-    case read_chunk_crc(Fd, Length) of
+scan_info(Fd, IMG, false, ?tEXt, Length, Z) ->
+    case read_chunk_crc(Fd, Length, Z) of
         {ok, Bin} ->
             scan_info(Fd, update_txt(IMG, Bin), false);
         Error -> Error
     end;
-scan_info(Fd, IMG, false, ?zTXt, Length) ->
-    case read_chunk_crc(Fd, Length) of
+scan_info(Fd, IMG, false, ?zTXt, Length, Z) ->
+    case read_chunk_crc(Fd, Length, Z) of
         {ok, Bin} ->
             [Key, CompressedValue] = binary:split(Bin, <<0, 0>>),
             Value = zlib:uncompress(CompressedValue),
             scan_info(Fd, set_attribute(IMG, list_to_atom(binary_to_list(Key)), binary_to_list(Value)), false);
         Error -> Error
     end;
-scan_info(Fd, IMG, false, ?bKGD, Length) ->
+scan_info(Fd, IMG, false, ?bKGD, Length, Z) ->
     CT = attribute(IMG, 'ColorType', undefined),
-    case read_chunk_crc(Fd, Length) of
+    case read_chunk_crc(Fd, Length, Z) of
         {ok, <<Index:8>>} when CT==3 ->
             scan_info(Fd, set_attribute(IMG, 'Background', Index), false);
         {ok, <<Gray:16>>} when CT==0; CT==4 ->
@@ -104,8 +106,8 @@ scan_info(Fd, IMG, false, ?bKGD, Length) ->
             scan_info(Fd, IMG, false);
         Error -> Error
     end;
-scan_info(Fd, IMG, false, ?tIME, Length) ->
-    case read_chunk_crc(Fd, Length) of
+scan_info(Fd, IMG, false, ?tIME, Length, Z) ->
+    case read_chunk_crc(Fd, Length, Z) of
         {ok, <<Year:16, Mon:8, Day:8, H:8, M:8, S:8>>} ->
             scan_info(Fd, IMG#erl_image { mtime = {{Year,Mon,Day},
                                                    {H,M,S}} }, false);
@@ -114,8 +116,8 @@ scan_info(Fd, IMG, false, ?tIME, Length) ->
             scan_info(Fd, IMG, false);
         Error -> Error
     end;
-scan_info(Fd, IMG, false, ?pHYs, Length) ->
-    case read_chunk_crc(Fd, Length) of
+scan_info(Fd, IMG, false, ?pHYs, Length, Z) ->
+    case read_chunk_crc(Fd, Length, Z) of
         {ok, <<X:32, Y:32, _Unit:8>>} ->
             scan_info(Fd, set_attribute(IMG,'Physical',{X,Y,meter}),false);
         {ok, _Data} ->
@@ -123,9 +125,9 @@ scan_info(Fd, IMG, false, ?pHYs, Length) ->
             scan_info(Fd, IMG, false);
         Error -> Error
     end;
-scan_info(Fd, IMG, false, ?tRNS, Length) ->
+scan_info(Fd, IMG, false, ?tRNS, Length, Z) ->
     CT = attribute(IMG, 'ColorType', undefined),
-    case read_chunk_crc(Fd, Length) of
+    case read_chunk_crc(Fd, Length, Z) of
         {ok, <<Gray:16>>} when CT == 0 ->
             scan_info(Fd, set_attribute(IMG, 'Transparent', Gray), false);
         {ok, <<R:16, B:16, G:16>>} when CT == 2 ->
@@ -134,9 +136,9 @@ scan_info(Fd, IMG, false, ?tRNS, Length) ->
             scan_info(Fd, IMG#erl_image { alpha_table = binary_to_list(Binary) }, false);
         Error -> Error
     end;
-scan_info(_Fd, IMG, false, ?IEND, 0) ->
+scan_info(_Fd, IMG, false, ?IEND, 0, _Z) ->
     {ok, IMG};
-scan_info(Fd, IMG, false, _Type, Length) ->
+scan_info(Fd, IMG, false, _Type, Length, _Z) ->
     ?dbg("~s skipped=~p\n", [_Type,Length]),
     skip_chunk(Fd, Length),
     scan_info(Fd, IMG, false).
@@ -239,6 +241,12 @@ plte(<<R,G,B, Data/binary>>) ->
 plte(<<>>) -> [].
 
 write_info(Fd, IMG) ->
+    Z = zlib:open(),
+    write_info(Fd, IMG, Z),
+    zlib:close(Z),
+    ok.
+
+write_info(Fd, IMG, Z) ->
     file:write(Fd, <<?MAGIC>>),
     ColorType = color_type(IMG#erl_image.format),
     write_chunk_crc(Fd, ?IHDR, <<
@@ -249,24 +257,23 @@ write_info(Fd, IMG) ->
         0, % Compression method
         0, % Filter method
         0  % Interlacing
-        >>).
+        >>, Z).
 
-
-write_chunk_crc(Fd, ChunkName, Chunk) ->
+write_chunk_crc(Fd, ChunkName, Chunk, Z) ->
     Binary = iolist_to_binary(Chunk),
     Length = byte_size(Binary),
     ChunkNameBinary = list_to_binary(ChunkName),
-    CRC32 = compute_crc32(<<ChunkNameBinary/binary, Binary/binary>>),
+    CRC32 = zlib:crc32(Z, <<ChunkNameBinary/binary, Binary/binary>>),
     file:write(Fd, <<(Length):32, ChunkNameBinary/binary, Binary/binary, (CRC32):32>>).
 
 write(Fd, IMG) ->
-    write_info(Fd, IMG),
     Z = zlib:open(),
+    write_info(Fd, IMG, Z),
     zlib:deflateInit(Z),
     case IMG#erl_image.format of
         Format when Format=:=palette1; Format=:=palette2; Format=:=palette4; Format=:=palette8 ->
             PaletteChunk = << <<R:8, G:8, B:8>> || {R, G, B} <- IMG#erl_image.palette >>,
-            write_chunk_crc(Fd, ?PLTE, PaletteChunk);
+            write_chunk_crc(Fd, ?PLTE, PaletteChunk, Z);
         _ ->
             ok
     end,
@@ -281,12 +288,12 @@ write(Fd, IMG) ->
                 4 -> <<Val:16>>;
                 6 -> {R, G, B} = Val, <<R:16, G:16, B:16>>
             end,
-            write_chunk_crc(Fd, ?bKGD, BackgroundChunk)
+            write_chunk_crc(Fd, ?bKGD, BackgroundChunk, Z)
     end,
     case attribute(IMG, 'Physical', undefined) of
         undefined -> ok;
-        {X, Y, meter} -> write_chunk_crc(Fd, ?pHYs, <<X:32, Y:32, 1>>);
-        {X, Y, undefined} -> write_chunk_crc(Fd, ?pHYs, <<X:32, Y:32, 0>>)
+        {X, Y, meter} -> write_chunk_crc(Fd, ?pHYs, <<X:32, Y:32, 1>>, Z);
+        {X, Y, undefined} -> write_chunk_crc(Fd, ?pHYs, <<X:32, Y:32, 0>>, Z)
     end,
     case attribute(IMG, 'Transparent', undefined) of
         undefined -> ok;
@@ -295,11 +302,11 @@ write(Fd, IMG) ->
                 0 -> <<TrVal:16>>;
                 2 -> {R0, G0, B0} = TrVal, <<R0:16, G0:16, B0:16>>
             end,
-            write_chunk_crc(Fd, ?tRNS, TransparentChunk)
+            write_chunk_crc(Fd, ?tRNS, TransparentChunk, Z)
     end,
     case IMG#erl_image.alpha_table of
         undefined -> ok;
-        List when ColorType =:= 3 -> write_chunk_crc(Fd, ?tRNS, List)
+        List when ColorType =:= 3 -> write_chunk_crc(Fd, ?tRNS, List, Z)
     end,
 
     Bpp = bpp(IMG#erl_image.format),
@@ -318,10 +325,10 @@ write(Fd, IMG) ->
                     RowNum1 < RowNum2
             end, PixMap#erl_pixmap.pixels)),
     CompressedData = zlib:deflate(Z, FilteredData, finish),
-    write_chunk_crc(Fd, ?IDAT, CompressedData),
+    write_chunk_crc(Fd, ?IDAT, CompressedData, Z),
     zlib:deflateEnd(Z),
+    write_chunk_crc(Fd, ?IEND, <<>>, Z),
     zlib:close(Z),
-    write_chunk_crc(Fd, ?IEND, <<>>),
     ok.
 
 
@@ -604,7 +611,7 @@ paethPredictor(A,B,C) ->
 read_image(Fd, Acc, Palette, Z) ->
     case read_chunk_hdr(Fd) of
         {ok, Length, ?IDAT} ->
-            case read_chunk_crc(Fd, Length) of
+            case read_chunk_crc(Fd, Length, Z) of
                 {ok, CBin} ->
                     Blocks = zlib:inflate(Z, CBin),
                     read_image(Fd, [Blocks|Acc], Palette, Z);
@@ -615,7 +622,7 @@ read_image(Fd, Acc, Palette, Z) ->
             {ok, list_to_binary(reverse(Acc)), Palette};
 
         {ok, Length, ?PLTE} ->
-            case read_chunk_crc(Fd, Length) of
+            case read_chunk_crc(Fd, Length, Z) of
                 {ok, Chunk} ->
                     read_image(Fd, Acc, plte(Chunk), Z);
                 Error ->
@@ -629,12 +636,12 @@ read_image(Fd, Acc, Palette, Z) ->
 %%
 %% Given chunk header read chunk and check crc
 %%
-read_chunk_crc(Fd, Length) ->
+read_chunk_crc(Fd, Length, Z) ->
     file:position(Fd, {cur,-4}),
     LengthWithType = Length+4,
     case file:read(Fd, LengthWithType+4) of
         {ok,<<TypeChunk:LengthWithType/binary, CRC:32>>} ->
-            case valid_crc32(TypeChunk, CRC) of
+            case valid_crc32(TypeChunk, CRC, Z) of
                 true ->
                     <<_:32, Chunk/binary>> = TypeChunk,
                     {ok, Chunk};
@@ -665,14 +672,8 @@ read_chunk_hdr(Fd) ->
 skip_chunk(Fd, Length) ->
     file:position(Fd, {cur,Length+4}).
 
-compute_crc32(Binary) ->
-    Z = zlib:open(),
-    Value = zlib:crc32(Z, Binary),
-    zlib:close(Z),
-    Value.
-
-valid_crc32(Binary, Value) ->
-    CRC32 = compute_crc32(Binary),
+valid_crc32(Binary, Value, Z) ->
+    CRC32 = zlib:crc32(Z, Binary),
     ?dbg("crc check: ~p == ~p\n", [CRC32, Value]),
     CRC32 == Value.
 
