@@ -291,6 +291,15 @@ crop(IMG, Width, Height, XOffset, YOffset) when Width < IMG#erl_image.width ->
         width = Width},
     crop(IMG1, Width, Height, XOffset, YOffset).
 
+sort_rows(IMG) ->
+    IMG#erl_image{
+        pixmaps = lists:map(fun(Pixmap) ->
+                    Pixmap#erl_pixmap{ 
+                        pixels = lists:sort(fun({RowA, _}, {RowB, _}) ->
+                                    RowA < RowB
+                            end, Pixmap#erl_pixmap.pixels)}
+            end, IMG#erl_image.pixmaps)
+    }.
 
 interpolate_cubic(X, A, B, C, D) ->
     B + 0.5 * X * (C - A + X * (2*A - 5*B + 4*C - D + X * (3*(B-C) + D - A))).
@@ -310,10 +319,7 @@ get_pixel_bytes(IMG, X, Y) ->
                                  Y >= PixMap#erl_pixmap.height + PixMap#erl_pixmap.top ->
                 Pixel;
             (PixMap, _Pixel) ->
-                {_, Data} = lists:nth(Y - PixMap#erl_pixmap.top + 1,
-                    lists:sort(fun({RowA, _}, {RowB, _}) ->
-                                RowA < RowB
-                        end, PixMap#erl_pixmap.pixels)),
+                {_, Data} = lists:nth(Y - PixMap#erl_pixmap.top + 1, PixMap#erl_pixmap.pixels),
                 binary:part(Data, (X - PixMap#erl_pixmap.left) * IMG#erl_image.bytes_pp, IMG#erl_image.bytes_pp)
         end, undefined, IMG#erl_image.pixmaps).
 
@@ -424,6 +430,6 @@ scale(IMG, XScaleFactor, YScaleFactor) ->
                 top = 0,
                 width = NewWidth,
                 height = NewHeight,
-                pixels = resample_pixels(IMG, NewWidth, NewHeight)}],
+                pixels = resample_pixels(sort_rows(IMG), NewWidth, NewHeight)}],
         width = NewWidth,
         height = NewHeight }.
