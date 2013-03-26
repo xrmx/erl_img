@@ -301,6 +301,11 @@ sort_rows(IMG) ->
             end, IMG#erl_image.pixmaps)
     }.
 
+rows_for_y(Y, IMG) -> lists:map(fun(PixMap) ->
+                {_, Data} = lists:nth(Y - PixMap#erl_pixmap.top + 1, PixMap#erl_pixmap.pixels),
+                Data
+        end, IMG#erl_image.pixmaps).
+
 interpolate_cubic(X, A, B, C, D) ->
     B + 0.5 * X * (C - A + X * (2*A - 5*B + 4*C - D + X * (3*(B-C) + D - A))).
 
@@ -311,17 +316,16 @@ interpolate_bicubic({X, Y}, {A1, B1, C1, D1}, {A2, B2, C2, D2}, {A3, B3, C3, D3}
         interpolate_cubic(X, A3, B3, C3, D3),
         interpolate_cubic(X, A4, B4, C4, D4)).
 
-get_pixel_bytes(IMG, X, Y) ->
+get_pixel_bytes(IMG, Rows, X, Y) ->
     lists:foldr(fun
-            (PixMap, Pixel) when X < PixMap#erl_pixmap.left; 
+            ({PixMap, _}, Pixel) when X < PixMap#erl_pixmap.left; 
                                  X >= PixMap#erl_pixmap.width + PixMap#erl_pixmap.left;
                                  Y < PixMap#erl_pixmap.top;
                                  Y >= PixMap#erl_pixmap.height + PixMap#erl_pixmap.top ->
                 Pixel;
-            (PixMap, _Pixel) ->
-                {_, Data} = lists:nth(Y - PixMap#erl_pixmap.top + 1, PixMap#erl_pixmap.pixels),
+            ({PixMap, Data}, _Pixel) ->
                 binary:part(Data, (X - PixMap#erl_pixmap.left) * IMG#erl_image.bytes_pp, IMG#erl_image.bytes_pp)
-        end, undefined, IMG#erl_image.pixmaps).
+        end, undefined, lists:zip(IMG#erl_image.pixmaps, Rows)).
 
 nearest_grid_points(Pos, Size) when Pos * Size =< 0.5 ->
     {0, 0, 0, 1};
@@ -361,30 +365,36 @@ resample_pixels(IMG, NewWidth, NewHeight) ->
     lists:map(fun(RowNum) ->
                 YPos = (RowNum + 0.5) / NewHeight,
                 {Ay, By, Cy, Dy} = nearest_grid_points(YPos, IMG#erl_image.height),
+                {Arows, Brows, Crows, Drows} = {
+                    rows_for_y(Ay, IMG),
+                    rows_for_y(By, IMG),
+                    rows_for_y(Cy, IMG),
+                    rows_for_y(Dy, IMG)
+                },
                 RowPixels = lists:map(fun(ColNum) ->
                             XPos = (ColNum + 0.5) / NewWidth,
                             {Ax, Bx, Cx, Dx} = nearest_grid_points(XPos, IMG#erl_image.width),
                             Pos = {XPos * IMG#erl_image.width - Bx - 0.5, YPos * IMG#erl_image.height - By - 0.5},
 
-                            Paa = get_pixel_bytes(IMG, Ax, Ay),
-                            Pab = get_pixel_bytes(IMG, Bx, Ay),
-                            Pac = get_pixel_bytes(IMG, Cx, Ay),
-                            Pad = get_pixel_bytes(IMG, Dx, Ay),
+                            Paa = get_pixel_bytes(IMG, Arows, Ax, Ay),
+                            Pab = get_pixel_bytes(IMG, Arows, Bx, Ay),
+                            Pac = get_pixel_bytes(IMG, Arows, Cx, Ay),
+                            Pad = get_pixel_bytes(IMG, Arows, Dx, Ay),
 
-                            Pba = get_pixel_bytes(IMG, Ax, By),
-                            Pbb = get_pixel_bytes(IMG, Bx, By),
-                            Pbc = get_pixel_bytes(IMG, Cx, By),
-                            Pbd = get_pixel_bytes(IMG, Dx, By),
+                            Pba = get_pixel_bytes(IMG, Brows, Ax, By),
+                            Pbb = get_pixel_bytes(IMG, Brows, Bx, By),
+                            Pbc = get_pixel_bytes(IMG, Brows, Cx, By),
+                            Pbd = get_pixel_bytes(IMG, Brows, Dx, By),
 
-                            Pca = get_pixel_bytes(IMG, Ax, Cy),
-                            Pcb = get_pixel_bytes(IMG, Bx, Cy),
-                            Pcc = get_pixel_bytes(IMG, Cx, Cy),
-                            Pcd = get_pixel_bytes(IMG, Dx, Cy),
+                            Pca = get_pixel_bytes(IMG, Crows, Ax, Cy),
+                            Pcb = get_pixel_bytes(IMG, Crows, Bx, Cy),
+                            Pcc = get_pixel_bytes(IMG, Crows, Cx, Cy),
+                            Pcd = get_pixel_bytes(IMG, Crows, Dx, Cy),
 
-                            Pda = get_pixel_bytes(IMG, Ax, Dy),
-                            Pdb = get_pixel_bytes(IMG, Bx, Dy),
-                            Pdc = get_pixel_bytes(IMG, Cx, Dy),
-                            Pdd = get_pixel_bytes(IMG, Dx, Dy),
+                            Pda = get_pixel_bytes(IMG, Drows, Ax, Dy),
+                            Pdb = get_pixel_bytes(IMG, Drows, Bx, Dy),
+                            Pdc = get_pixel_bytes(IMG, Drows, Cx, Dy),
+                            Pdd = get_pixel_bytes(IMG, Drows, Dx, Dy),
 
                             lists:map(fun(ChannelNum) ->
                                         <<CHaa:Depth>> = binary:part(Paa, ChannelNum * BytesPerChannel, BytesPerChannel),
