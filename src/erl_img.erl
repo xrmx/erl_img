@@ -310,11 +310,11 @@ get_pixel_bytes(IMG, X, Y) ->
                                  Y >= PixMap#erl_pixmap.height + PixMap#erl_pixmap.top ->
                 Pixel;
             (PixMap, _Pixel) ->
-                {_, Data} = lists:nth(X - PixMap#erl_pixmap.left + 1,
+                {_, Data} = lists:nth(Y - PixMap#erl_pixmap.top + 1,
                     lists:sort(fun({RowA, _}, {RowB, _}) ->
                                 RowA < RowB
                         end, PixMap#erl_pixmap.pixels)),
-                binary:part(Data, (Y - PixMap#erl_pixmap.top) * IMG#erl_image.bytes_pp, IMG#erl_image.bytes_pp)
+                binary:part(Data, (X - PixMap#erl_pixmap.left) * IMG#erl_image.bytes_pp, IMG#erl_image.bytes_pp)
         end, undefined, IMG#erl_image.pixmaps).
 
 nearest_grid_points(Pos, Size) when Pos * Size =< 0.5 ->
