@@ -10,7 +10,13 @@ API
 ---
 
 To use erl_img, you will need to include the erl_image.hrl header file to get
-the appropriate record definitions. The erl_img API is:
+the appropriate record definitions. If you're using rebar, an include like this will work:
+
+```
+-include_lib("erl_img/include/erl_img.hrl").
+```
+
+The erl_img API is:
 
     % Read
     erl_img:load("/path/to/image.ext") -> {ok, IMG#erl_image}
