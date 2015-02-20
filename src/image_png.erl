@@ -322,8 +322,10 @@ write(Fd, IMG) ->
                 FilteredBytes = filter(FilterMethod, Bpp, PixelData, LastRow),
                 {PixelData, [[FilterMethod, FilteredBytes]|Acc]}
         end, {undefined, []},
-        lists:sort(fun({RowNum1, _Data1}, {RowNum2, _Data2}) -> 
-                    RowNum1 < RowNum2
+        %% Sort by rownum descending, so the output of the foldl will be ascending
+        %%   (as it builds up the result by prepending elements)
+        lists:sort(fun({RowNum1, _Data1}, {RowNum2, _Data2}) ->
+                    RowNum1 > RowNum2
             end, PixMap#erl_pixmap.pixels)),
     CompressedData = zlib:deflate(Z, FilteredData, finish),
     write_chunk_crc(Fd, ?IDAT, CompressedData, Z),
@@ -383,7 +385,7 @@ raw_data(Bin,Pix,RowFun,St0,Ri,Bpp,Width) ->
             St1 = RowFun(Pix,Row1,Ri,St0),
             raw_data(Bin1,Pix,RowFun,St1,Ri+1,Bpp,Width);
         _ ->
-            {ok, Pix#erl_pixmap { pixels = St0 }}
+            {ok, Pix#erl_pixmap { pixels = lists:reverse(St0) }}
     end.
 
 interlaced_data(Bin, Pix0=#erl_pixmap{width=Width, height=Height},
