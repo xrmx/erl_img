@@ -23,8 +23,8 @@
 -define(M_SOS,  16#DA).       %% Start Of Scan (begins compressed data)
 -define(M_DQT,  16#DB).
 -define(M_DRI,  16#DD).
--define(M_APP0, 16#E0).       %% Jfif marker
--define(M_APP1, 16#E1).       %% Exif marker
+-define(M_JFIF, 16#E0).       %% Jfif marker
+-define(M_EXIF, 16#E1).       %% Exif marker
 -define(M_COM,  16#FE).       %% COMment 
 
 -endif.

@@ -73,6 +73,6 @@ by each file type.
     gray*                         RW        R
     r8g8b8                  R     RW   RW   R
     r8g8b8a8                      RW   RW   R
-    r16g16b16                     RW
-    r16g16b16a16                  RW
+    r16g16b16                     RW        R
+    r16g16b16a16                  RW        R
     palette*           R          RW        R    R

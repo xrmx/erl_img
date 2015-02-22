@@ -45,12 +45,14 @@
 -define(Cb(R,G,B), (-0.1687*(R) - 0.3313*(G) + 0.5*(B) + 128)).
 -define(Cr(R,G,B), (0.5*R - 0.4187*(G) - 0.0813*(B) + 128)).
 
-magic(<<?M_MARK,?M_SOI,?M_MARK,?M_APP1,_Len:16,"Exif",0,0,_/binary>>) ->
-    true;
-magic(<<?M_MARK,?M_SOI,?M_MARK,?M_APP0,_Len:16,"JFIF",_,_,_/binary>>) -> 
-    true;
-magic(_) -> 
-    false.
+magic(<<?M_MARK,?M_SOI,?M_MARK,?M_EXIF,_Len:16,"Exif",0,0,_/binary>>) -> true;
+magic(<<?M_MARK,?M_SOI,?M_MARK,?M_JFIF,_Len:16,"JFIF",_,_,_/binary>>) -> true;
+magic(<<?M_MARK,?M_SOI,?M_MARK,?M_DQT,_/binary>>) -> true;
+magic(<<?M_MARK,?M_SOI,?M_MARK,?M_DHT,_/binary>>) -> true;
+magic(<<?M_MARK,?M_SOI,?M_MARK,?M_SOF0,_/binary>>) -> true;
+magic(<<?M_MARK,?M_SOI,?M_MARK,?M_SOS,_/binary>>) -> true;
+magic(<<?M_MARK,?M_SOI,?M_MARK,?M_COM,_/binary>>) -> true;
+magic(_) -> false.
 
 mime_type() -> "image/jpeg".
 
@@ -97,16 +99,16 @@ read_segments(JFd0,Ei0) ->
 		    fun(Bin,Ei) ->
 			    Ei#erl_image {comment=binary_to_list(Bin)}
 		    end);
-	{JFd1,?M_APP0} ->
-	    ?dbg("APP0\n",[]),
+	{JFd1,?M_JFIF} ->
+	    ?dbg("JFIF\n",[]),
 	    segment(JFd1,Ei0,
 		    fun(<<"JFIF",0,Bin/binary>>,Ei) ->
 			    process_jfif(Bin,Ei);
 		       (_,Ei) ->
 			    Ei
 		    end);
-	{JFd1,?M_APP1} ->
-	    ?dbg("APP1\n",[]),
+	{JFd1,?M_EXIF} ->
+	    ?dbg("EXIF\n",[]),
 	    segment(JFd1,Ei0,
 		    fun(<<"Exif",0,0,Bin/binary>>,Ei) ->
 			    process_exif(Bin,Ei);
