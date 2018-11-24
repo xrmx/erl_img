@@ -13,7 +13,6 @@
 -define(IMAGE_X_XPIXMAP, image_x_xpixmap).
 -define(IMAGE_UNDEF,     image_undef).
 -define(IMAGE_TGA,       image_tga).
--define(VIDEO_MPEG,      video_mpeg).
 
 -define(PAD_Len(L,A), (((A)-((L) rem (A))) rem (A))).
 
@@ -38,8 +37,7 @@
                       ?IMAGE_PNG,
                       ?IMAGE_BMP,
                       ?IMAGE_X_XPIXMAP,
-                      ?IMAGE_TGA,
-                      ?VIDEO_MPEG]).
+                      ?IMAGE_TGA]).
 
 -record(erl_pixmap,
         {
